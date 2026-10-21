@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest'
+import { createSeedProject } from '../core/project'
+import {
+  checkTransportPath,
+  furnitureToObb,
+  intersectsObb,
+  isObbInsideRoom,
+  placementStatus,
+} from './collision'
+
+describe('FIT-Kollisionskern', () => {
+  it('erkennt getrennte Starter-Möbel als nicht überlappend', () => {
+    const project = createSeedProject()
+    expect(
+      intersectsObb(furnitureToObb(project.furniture[0]), furnitureToObb(project.furniture[1])),
+    ).toBe(false)
+    const placement = placementStatus(project, project.furniture[0].id)
+    expect(placement.status).toBe('clear')
+    expect(placement.startStatus).toBe('clear')
+    expect(placement.interpolation).toBe('linear-shortest-yaw')
+  })
+
+  it('meldet Kollision, wenn ein Objekt in ein anderes geschoben wird', () => {
+    const seed = createSeedProject()
+    const project = {
+      ...seed,
+      furniture: seed.furniture.map((item) => ({ ...item, minimumClearanceM: 0 })),
+    }
+    const sofa = project.furniture[0]
+    const table = project.furniture[1]
+    const result = checkTransportPath(project, sofa.id, {
+      position: { ...table.position },
+      orientation: { ...sofa.orientation },
+    })
+    expect(result.status).toBe('collision')
+    expect(result.colliderId).toBe(table.id)
+    expect(result.checkedSamples).toBeGreaterThan(1)
+  })
+
+  it('unterscheidet Mindestabstand von harter OBB-Berührung', () => {
+    const project = createSeedProject()
+    const sofa = project.furniture[0]
+    const table = project.furniture[1]
+    const nearButSeparate = {
+      ...table.position,
+      xM: sofa.position.xM + sofa.dimensions.width.valueM / 2 + table.dimensions.width.valueM / 2 + 0.03,
+      zM: sofa.position.zM,
+    }
+    const moved = {
+      ...project,
+      furniture: project.furniture.map((item) =>
+        item.id === table.id ? { ...item, position: nearButSeparate } : item,
+      ),
+    }
+    expect(placementStatus(moved, table.id).status).toBe('clearance')
+  })
+
+  it('erkennt Türfreizone und Raumaustritt ohne Wegsuche', () => {
+    const seed = createSeedProject()
+    const sofa = { ...seed.furniture[0], minimumClearanceM: 0 }
+    const project = { ...seed, furniture: [sofa] }
+    const doorResult = checkTransportPath(project, sofa.id, {
+      position: { xM: -1.35, yM: 0, zM: 1.7 },
+      orientation: { ...sofa.orientation },
+    })
+    expect(doorResult.status).toBe('door-blocked')
+    expect(doorResult.colliderId).toBe(project.doors[0].id)
+
+    const outside = checkTransportPath(project, sofa.id, {
+      position: { xM: 0, yM: 0, zM: -8 },
+      orientation: { ...sofa.orientation },
+    })
+    expect(outside.status).toBe('outside-room')
+    expect(isObbInsideRoom(furnitureToObb(sofa), project)).toBe(true)
+  })
+
+  it('interpoliert den kürzesten Yaw und prüft den Startzustand ehrlich', () => {
+    const seed = createSeedProject()
+    const sofa = { ...seed.furniture[0], orientation: { rotationYDeg: 350, tiltXDeg: 0, tiltZDeg: 0 } }
+    const project = { ...seed, furniture: [sofa, seed.furniture[1]] }
+    const result = checkTransportPath(
+      project,
+      sofa.id,
+      {
+        position: sofa.position,
+        orientation: { rotationYDeg: 10, tiltXDeg: 0, tiltZDeg: 0 },
+      },
+      0.02,
+    )
+    expect(result.status).toBe('clear')
+    expect(result.startStatus).toBe('clear')
+    expect(result.checkedSamples).toBeGreaterThan(10)
+  })
+
+  it('blockiert die Türöffnung durch ein gemessenes sichtbares Hindernis', () => {
+    const seed = createSeedProject()
+    const chair = {
+      ...seed.furniture[0],
+      id: 'chair-block',
+      kind: 'chair' as const,
+      minimumClearanceM: 0,
+      dimensions: {
+        width: seed.furniture[0].dimensions.width,
+        height: seed.furniture[0].dimensions.height,
+        depth: seed.furniture[0].dimensions.depth,
+      },
+    }
+    const door = {
+      ...seed.doors[0],
+      openingAngleDeg: 20,
+      visibleObstacle: {
+        ...seed.doors[0].visibleObstacle,
+        valueM: 0.35,
+      },
+      swingDepthM: 0.2,
+    }
+    const project = {
+      ...seed,
+      doors: [door],
+      furniture: [
+        {
+          ...chair,
+          dimensions: {
+            width: { ...chair.dimensions.width, valueM: 0.4 },
+            height: { ...chair.dimensions.height, valueM: 0.4 },
+            depth: { ...chair.dimensions.depth, valueM: 0.4 },
+          },
+          position: { xM: -1.35, yM: 0, zM: 1.85 },
+        },
+      ],
+    }
+    const result = placementStatus(project, project.furniture[0].id)
+    expect(result.status).toBe('door-blocked')
+  })
+
+  it('weist ungültige Schrittweiten zurück', () => {
+    const project = createSeedProject()
+    expect(() =>
+      checkTransportPath(
+        project,
+        project.furniture[0].id,
+        {
+          position: project.furniture[0].position,
+          orientation: project.furniture[0].orientation,
+        },
+        0,
+      ),
+    ).toThrow(RangeError)
+  })
+})
