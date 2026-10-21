@@ -44,6 +44,17 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.app-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: #6f9aae;
+  background: #070d18;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
 .landing {
   position: relative;
   min-height: 100vh;
