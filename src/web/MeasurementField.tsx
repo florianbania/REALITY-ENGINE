@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SOURCE_LABELS, type Measurement } from '../core/model'
-import { fromMeters, toMeters } from '../core/units'
+import { clampPrecision, fromMeters, toMeters } from '../core/units'
 
 interface MeasurementFieldProps {
   label: string
@@ -19,9 +19,9 @@ export function MeasurementField(props: MeasurementFieldProps) {
 }
 
 function MeasurementDraft({ label, measurement, onCommit }: MeasurementFieldProps) {
-  const [value, setValue] = useState(String(fromMeters(measurement.valueM, 'cm')))
+  const [value, setValue] = useState(String(clampPrecision(fromMeters(measurement.valueM, 'cm'), 4)))
   const [uncertainty, setUncertainty] = useState(
-    String(fromMeters(measurement.uncertaintyM, 'cm')),
+    String(clampPrecision(fromMeters(measurement.uncertaintyM, 'cm'), 4)),
   )
 
   const commit = () => {
