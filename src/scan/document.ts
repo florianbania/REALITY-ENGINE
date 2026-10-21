@@ -1,4 +1,5 @@
 import {
+  FURNITURE_KINDS,
   PROJECT_SCHEMA,
   type DigitalTwinProject,
   type DimensionKey,
@@ -313,7 +314,7 @@ function parseTarget(value: unknown, path: string, issues: string[]): ScanTarget
   if (item.type === 'furniture') {
     return { type: 'furniture', id: text(item.id, `${path}.id`, issues) }
   }
-  const kinds: FurnitureKind[] = ['sofa', 'table', 'chair', 'cabinet', 'bed']
+  const kinds = [...FURNITURE_KINDS] as FurnitureKind[]
   const kind = kinds.includes(item.kind as FurnitureKind)
     ? (item.kind as FurnitureKind)
     : (issues.push(`${path}.kind ist unbekannt.`), 'table')

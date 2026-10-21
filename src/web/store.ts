@@ -11,8 +11,10 @@ import type {
 } from '../core/model'
 import { migrateProjectValue, validateProject } from '../core/project-io'
 import {
+  FURNITURE_LABELS,
   createFurniture,
   createStarterProject,
+  updateDoor,
   updateFurnitureMeasurement,
   updateRoomMeasurement,
 } from '../core/project'
@@ -64,6 +66,10 @@ interface ProjectState {
   updateFurnitureClearance: (id: string, minimumClearanceM: number) => void
   updateSunSettings: (settings: Partial<SunSettings>) => void
   applyScan: (document: ScanDocument, now?: string) => ScanApplyResult
+  updateDoor: (
+    doorId: string,
+    patch: Parameters<typeof updateDoor>[2],
+  ) => void
 }
 
 const initialProject = createStarterProject()
@@ -136,14 +142,7 @@ export const useProjectStore = create<ProjectState>()(
       },
       selectFurniture: (selectedFurnitureId) => set({ selectedFurnitureId }),
       addFurniture: (kind) => {
-        const names: Record<FurnitureKind, string> = {
-          sofa: 'Sofa',
-          table: 'Tisch',
-          chair: 'Stuhl',
-          cabinet: 'Schrank',
-          bed: 'Bett',
-        }
-        const item = createFurniture(kind, names[kind])
+        const item = createFurniture(kind, FURNITURE_LABELS[kind])
         set((state) => ({
           ...updateActive(state, (project) => ({
             ...project,
@@ -280,6 +279,8 @@ export const useProjectStore = create<ProjectState>()(
             sun: { ...project.sun, ...settings },
           })),
         ),
+      updateDoor: (doorId, patch) =>
+        set((state) => updateActive(state, (project) => updateDoor(project, doorId, patch))),
       applyScan: (document, now = new Date().toISOString()) => {
         const state = get()
         const current =
@@ -298,7 +299,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'reality-engine-projects-v1',
-      version: 4,
+      version: 5,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<ProjectState>
         const migratedProjects = (persisted.projects ?? [])

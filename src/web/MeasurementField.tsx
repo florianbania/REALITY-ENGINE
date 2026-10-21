@@ -6,6 +6,7 @@ interface MeasurementFieldProps {
   label: string
   measurement: Measurement
   onCommit: (valueM: number, uncertaintyM: number) => void
+  allowZero?: boolean
 }
 
 export function MeasurementField(props: MeasurementFieldProps) {
@@ -18,7 +19,7 @@ export function MeasurementField(props: MeasurementFieldProps) {
   )
 }
 
-function MeasurementDraft({ label, measurement, onCommit }: MeasurementFieldProps) {
+function MeasurementDraft({ label, measurement, onCommit, allowZero }: MeasurementFieldProps) {
   const [value, setValue] = useState(String(clampPrecision(fromMeters(measurement.valueM, 'cm'), 4)))
   const [uncertainty, setUncertainty] = useState(
     String(clampPrecision(fromMeters(measurement.uncertaintyM, 'cm'), 4)),
@@ -27,7 +28,8 @@ function MeasurementDraft({ label, measurement, onCommit }: MeasurementFieldProp
   const commit = () => {
     const nextValue = Number(value)
     const nextUncertainty = Number(uncertainty)
-    if (Number.isFinite(nextValue) && nextValue > 0 && nextUncertainty >= 0) {
+    const min = allowZero ? 0 : 0.0001
+    if (Number.isFinite(nextValue) && nextValue >= min && nextUncertainty >= 0) {
       onCommit(toMeters(nextValue, 'cm'), toMeters(nextUncertainty, 'cm'))
     }
   }
@@ -36,7 +38,10 @@ function MeasurementDraft({ label, measurement, onCommit }: MeasurementFieldProp
     <div className="measurement-field">
       <div className="measurement-field__header">
         <label htmlFor={`${label}-value`}>{label}</label>
-        <span title={`Aktualisiert: ${new Date(measurement.updatedAt).toLocaleString('de-DE')}`}>
+        <span
+          className={`source-chip source-chip--${measurement.source}`}
+          title={`Quelle ${SOURCE_LABELS[measurement.source]} · aktualisiert ${new Date(measurement.updatedAt).toLocaleString('de-DE')}`}
+        >
           {SOURCE_LABELS[measurement.source]}
         </span>
       </div>
@@ -55,7 +60,7 @@ function MeasurementDraft({ label, measurement, onCommit }: MeasurementFieldProp
           />
           <span>cm</span>
         </div>
-        <div className="uncertainty-input" title="Messunsicherheit">
+        <div className="uncertainty-input" title="Angegebene Messunsicherheit, keine Kalibrierung">
           <span>±</span>
           <input
             type="number"

@@ -64,6 +64,7 @@ describe('FIT-Kollisionskern', () => {
       orientation: { ...sofa.orientation },
     })
     expect(doorResult.status).toBe('door-blocked')
+    expect(doorResult.colliderId).toBe(project.doors[0].id)
 
     const outside = checkTransportPath(project, sofa.id, {
       position: { xM: 0, yM: 0, zM: -8 },
@@ -89,6 +90,47 @@ describe('FIT-Kollisionskern', () => {
     expect(result.status).toBe('clear')
     expect(result.startStatus).toBe('clear')
     expect(result.checkedSamples).toBeGreaterThan(10)
+  })
+
+  it('blockiert die Türöffnung durch ein gemessenes sichtbares Hindernis', () => {
+    const seed = createSeedProject()
+    const chair = {
+      ...seed.furniture[0],
+      id: 'chair-block',
+      kind: 'chair' as const,
+      minimumClearanceM: 0,
+      dimensions: {
+        width: seed.furniture[0].dimensions.width,
+        height: seed.furniture[0].dimensions.height,
+        depth: seed.furniture[0].dimensions.depth,
+      },
+    }
+    const door = {
+      ...seed.doors[0],
+      openingAngleDeg: 20,
+      visibleObstacle: {
+        ...seed.doors[0].visibleObstacle,
+        valueM: 0.35,
+      },
+      swingDepthM: 0.2,
+    }
+    const project = {
+      ...seed,
+      doors: [door],
+      furniture: [
+        {
+          ...chair,
+          dimensions: {
+            width: { ...chair.dimensions.width, valueM: 0.4 },
+            height: { ...chair.dimensions.height, valueM: 0.4 },
+            depth: { ...chair.dimensions.depth, valueM: 0.4 },
+          },
+          position: { xM: -1.35, yM: 0, zM: 1.85 },
+        },
+      ],
+    }
+    const result = placementStatus(project, project.furniture[0].id)
+    expect(result.status).toBe('door-blocked')
   })
 
   it('weist ungültige Schrittweiten zurück', () => {

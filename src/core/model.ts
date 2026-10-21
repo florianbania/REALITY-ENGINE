@@ -1,8 +1,35 @@
 export const PROJECT_SCHEMA = 'reality-engine/project'
-export const PROJECT_SCHEMA_VERSION = 4 as const
+export const PROJECT_SCHEMA_VERSION = 5 as const
 
 export type MeasurementSource = 'manual' | 'import' | 'scan'
-export type FurnitureKind = 'sofa' | 'table' | 'chair' | 'cabinet' | 'bed'
+
+export const FURNITURE_KINDS = [
+  'sofa',
+  'armchair',
+  'table',
+  'desk',
+  'chair',
+  'cabinet',
+  'sideboard',
+  'shelf',
+  'bed',
+  'nightstand',
+] as const
+
+export type FurnitureKind = (typeof FURNITURE_KINDS)[number]
+
+export const FURNITURE_LABELS: Record<FurnitureKind, string> = {
+  sofa: 'Sofa',
+  armchair: 'Sessel',
+  table: 'Tisch',
+  desk: 'Schreibtisch',
+  chair: 'Stuhl',
+  cabinet: 'Schrank',
+  sideboard: 'Sideboard',
+  shelf: 'Regal',
+  bed: 'Bett',
+  nightstand: 'Nachttisch',
+}
 
 export interface Measurement {
   /** Canonical SI value. UI conversions must happen at the boundary. */
@@ -48,6 +75,7 @@ export interface Room {
 }
 
 export type WallSide = 'north' | 'east' | 'south' | 'west'
+export type HingeSide = 'left' | 'right'
 
 export interface Door {
   id: string
@@ -56,7 +84,14 @@ export interface Door {
   offsetM: number
   width: Measurement
   height: Measurement
+  /** Conserved from v4; equals the interior swing depth at the current opening angle. */
   swingDepthM: number
+  frameThickness: Measurement
+  leafThickness: Measurement
+  openingAngleDeg: number
+  hinge: HingeSide
+  /** User-measured depth of a visible obstacle in the swing (radiator, shoe rack). 0 if none. */
+  visibleObstacle: Measurement
 }
 
 export type OpeningKind = 'window' | 'opening'

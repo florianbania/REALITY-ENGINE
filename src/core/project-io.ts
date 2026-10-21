@@ -1,4 +1,5 @@
 import {
+  FURNITURE_KINDS,
   PROJECT_SCHEMA,
   PROJECT_SCHEMA_VERSION,
   type DigitalTwinProject,
@@ -6,6 +7,7 @@ import {
   type Dimensions,
   type FurnitureKind,
   type FurnitureObject,
+  type HingeSide,
   type Measurement,
   type MeasurementSource,
   type Orientation3D,
@@ -136,11 +138,70 @@ export function migrateProjectValue(value: unknown): unknown {
   if (root.schemaVersion === 3) {
     root = {
       ...root,
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: 4,
       openings: Array.isArray(root.openings) ? root.openings : [],
     }
   }
+  if (root.schemaVersion === 4) {
+    const doors = Array.isArray(root.doors)
+      ? root.doors.map((entry) => migrateDoorToV5(entry))
+      : root.doors
+    root = {
+      ...root,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      doors,
+    }
+  }
   return root
+}
+
+function migrateDoorToV5(entry: unknown): unknown {
+  if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry
+  const door = entry as Record<string, unknown>
+  const width = measurementRecord(door.width)
+  const widthM = typeof width?.valueM === 'number' ? width.valueM : 0.9
+  const swing =
+    typeof door.swingDepthM === 'number' && Number.isFinite(door.swingDepthM)
+      ? door.swingDepthM
+      : widthM
+  const openingAngleDeg =
+    typeof door.openingAngleDeg === 'number' && Number.isFinite(door.openingAngleDeg)
+      ? door.openingAngleDeg
+      : 90
+  const stamp = isoOrNow(width?.updatedAt)
+  const assumed = (valueM: number) => ({
+    valueM,
+    source: 'manual',
+    uncertaintyM: 0.01,
+    updatedAt: stamp,
+  })
+  return {
+    ...door,
+    frameThickness: door.frameThickness ?? assumed(0.06),
+    leafThickness: door.leafThickness ?? assumed(0.04),
+    openingAngleDeg,
+    hinge: door.hinge === 'right' ? 'right' : 'left',
+    visibleObstacle: door.visibleObstacle ?? {
+      valueM: 0,
+      source: 'manual',
+      uncertaintyM: 0.005,
+      updatedAt: stamp,
+    },
+    swingDepthM: swing,
+  }
+}
+
+function measurementRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return null
+}
+
+function isoOrNow(value: unknown): string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+    ? value
+    : '2026-01-01T00:00:00.000Z'
 }
 
 function parseRoom(value: unknown, path: string, issues: string[]): Room {
@@ -154,7 +215,7 @@ function parseRoom(value: unknown, path: string, issues: string[]): Room {
 
 function parseFurniture(value: unknown, path: string, issues: string[]): FurnitureObject {
   const item = record(value, path, issues)
-  const kinds: FurnitureKind[] = ['sofa', 'table', 'chair', 'cabinet', 'bed']
+  const kinds = [...FURNITURE_KINDS]
   const kind = kinds.includes(item.kind as FurnitureKind)
     ? (item.kind as FurnitureKind)
     : (issues.push(`${path}.kind ist unbekannt.`), 'table')
@@ -204,6 +265,14 @@ function parseDoor(value: unknown, path: string, issues: string[]): Door {
   const wall = walls.includes(item.wall as WallSide)
     ? (item.wall as WallSide)
     : (issues.push(`${path}.wall ist unbekannt.`), 'south')
+  const hinges: HingeSide[] = ['left', 'right']
+  const hinge = hinges.includes(item.hinge as HingeSide)
+    ? (item.hinge as HingeSide)
+    : (issues.push(`${path}.hinge ist unbekannt.`), 'left')
+  const openingAngleDeg = finiteNumber(item.openingAngleDeg, `${path}.openingAngleDeg`, issues)
+  if (openingAngleDeg < 0 || openingAngleDeg > 180) {
+    issues.push(`${path}.openingAngleDeg muss zwischen 0° und 180° liegen.`)
+  }
   return {
     id: text(item.id, `${path}.id`, issues),
     name: text(item.name, `${path}.name`, issues),
@@ -211,7 +280,16 @@ function parseDoor(value: unknown, path: string, issues: string[]): Door {
     offsetM: finiteNumber(item.offsetM, `${path}.offsetM`, issues),
     width: parseMeasurement(item.width, `${path}.width`, issues),
     height: parseMeasurement(item.height, `${path}.height`, issues),
-    swingDepthM: positiveNumber(item.swingDepthM, `${path}.swingDepthM`, issues),
+    swingDepthM: nonNegativeNumber(item.swingDepthM, `${path}.swingDepthM`, issues),
+    frameThickness: parseMeasurement(item.frameThickness, `${path}.frameThickness`, issues),
+    leafThickness: parseMeasurement(item.leafThickness, `${path}.leafThickness`, issues),
+    openingAngleDeg,
+    hinge,
+    visibleObstacle: parseNonNegativeMeasurement(
+      item.visibleObstacle,
+      `${path}.visibleObstacle`,
+      issues,
+    ),
   }
 }
 
@@ -277,6 +355,27 @@ function parseMeasurement(value: unknown, path: string, issues: string[]): Measu
     ? (item.source as MeasurementSource)
     : (issues.push(`${path}.source ist unbekannt.`), 'manual')
   const valueM = positiveNumber(item.valueM, `${path}.valueM`, issues)
+  const uncertaintyM = finiteNumber(item.uncertaintyM, `${path}.uncertaintyM`, issues)
+  if (uncertaintyM < 0) issues.push(`${path}.uncertaintyM darf nicht negativ sein.`)
+  return {
+    valueM,
+    source,
+    uncertaintyM,
+    updatedAt: isoDate(item.updatedAt, `${path}.updatedAt`, issues),
+  }
+}
+
+function parseNonNegativeMeasurement(
+  value: unknown,
+  path: string,
+  issues: string[],
+): Measurement {
+  const item = record(value, path, issues)
+  const sources: MeasurementSource[] = ['manual', 'import', 'scan']
+  const source = sources.includes(item.source as MeasurementSource)
+    ? (item.source as MeasurementSource)
+    : (issues.push(`${path}.source ist unbekannt.`), 'manual')
+  const valueM = nonNegativeNumber(item.valueM, `${path}.valueM`, issues)
   const uncertaintyM = finiteNumber(item.uncertaintyM, `${path}.uncertaintyM`, issues)
   if (uncertaintyM < 0) issues.push(`${path}.uncertaintyM darf nicht negativ sein.`)
   return {

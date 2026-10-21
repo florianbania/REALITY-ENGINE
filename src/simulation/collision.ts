@@ -5,6 +5,7 @@ import type {
   Opening,
   Orientation3D,
   Position3D,
+  WallSide,
 } from '../core/model'
 
 export interface Vec3 {
@@ -215,40 +216,113 @@ export function checkTransportPath(
   }
 }
 
-/** Conservative rectangular door swing/clearance zone inside the room. */
-export function doorClearanceObb(project: DigitalTwinProject, door: Door): Obb {
+export function wallInward(wall: WallSide): Vec3 {
+  if (wall === 'south') return { x: 0, y: 0, z: -1 }
+  if (wall === 'north') return { x: 0, y: 0, z: 1 }
+  if (wall === 'east') return { x: -1, y: 0, z: 0 }
+  return { x: 1, y: 0, z: 0 }
+}
+
+export function doorOpeningCenter(project: DigitalTwinProject, door: Door): Vec3 {
   const roomWidth = project.room.dimensions.width.valueM
   const roomDepth = project.room.dimensions.depth.valueM
-  const width = door.width.valueM
-  const depth = door.swingDepthM
+  if (door.wall === 'south') return { x: door.offsetM, y: 0, z: roomDepth / 2 }
+  if (door.wall === 'north') return { x: door.offsetM, y: 0, z: -roomDepth / 2 }
+  if (door.wall === 'east') return { x: roomWidth / 2, y: 0, z: door.offsetM }
+  return { x: -roomWidth / 2, y: 0, z: door.offsetM }
+}
+
+export function doorLeafObb(project: DigitalTwinProject, door: Door): Obb {
+  const { hinge, closedDir, inward } = doorHingeFrame(project, door)
+  const angle = clampDoorAngle(door.openingAngleDeg)
+  const leafDir = rotateToward(closedDir, inward, (angle * Math.PI) / 180)
+  const length = door.width.valueM
+  const thickness = door.leafThickness.valueM
   const height = door.height.valueM
-  const horizontal = door.wall === 'north' || door.wall === 'south'
-  const center: Vec3 = { x: 0, y: height / 2, z: 0 }
-  if (door.wall === 'south') {
-    center.x = door.offsetM
-    center.z = roomDepth / 2 - depth / 2
-  } else if (door.wall === 'north') {
-    center.x = door.offsetM
-    center.z = -roomDepth / 2 + depth / 2
-  } else if (door.wall === 'east') {
-    center.x = roomWidth / 2 - depth / 2
-    center.z = door.offsetM
-  } else {
-    center.x = -roomWidth / 2 + depth / 2
-    center.z = door.offsetM
-  }
+  const perp = unit({
+    x: -leafDir.z,
+    y: 0,
+    z: leafDir.x,
+  })
+  const inwardPerp = dot(perp, inward) >= 0 ? perp : scale(perp, -1)
+  const center = add(
+    hinge,
+    add(scale(leafDir, length / 2), add(scale(inwardPerp, thickness / 2), { x: 0, y: height / 2, z: 0 })),
+  )
   return {
     center,
-    halfSize: {
-      x: (horizontal ? width : depth) / 2,
-      y: height / 2,
-      z: (horizontal ? depth : width) / 2,
-    },
+    halfSize: { x: length / 2, y: height / 2, z: thickness / 2 },
+    axes: [leafDir, { x: 0, y: 1, z: 0 }, inwardPerp],
+  }
+}
+
+export function doorObstacleObb(project: DigitalTwinProject, door: Door): Obb | null {
+  const depth = door.visibleObstacle.valueM
+  if (depth <= EPSILON) return null
+  const inward = wallInward(door.wall)
+  const opening = doorOpeningCenter(project, door)
+  const width = door.width.valueM
+  const height = Math.min(door.height.valueM, 0.4)
+  const tangent =
+    door.wall === 'north' || door.wall === 'south'
+      ? { x: 1, y: 0, z: 0 }
+      : { x: 0, y: 0, z: 1 }
+  const center = add(opening, add(scale(inward, depth / 2), { x: 0, y: height / 2, z: 0 }))
+  return {
+    center,
+    halfSize: { x: width / 2, y: height / 2, z: depth / 2 },
+    axes: [tangent, { x: 0, y: 1, z: 0 }, inward],
+  }
+}
+
+/**
+ * Conservative axis-aligned box covering the opened leaf, the swing rectangle
+ * at the stated angle, and a user-measured visible obstacle. Not a CAD sector.
+ */
+export function doorClearanceObb(project: DigitalTwinProject, door: Door): Obb {
+  const parts = [doorLeafObb(project, door), doorSwingRectangle(project, door)]
+  const obstacle = doorObstacleObb(project, door)
+  if (obstacle) parts.push(obstacle)
+  const corners = parts.flatMap((part) => obbCorners(part))
+  const xs = corners.map((c) => c.x)
+  const ys = corners.map((c) => c.y)
+  const zs = corners.map((c) => c.z)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  const minZ = Math.min(...zs)
+  const maxZ = Math.max(...zs)
+  return {
+    center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 },
+    halfSize: { x: (maxX - minX) / 2, y: (maxY - minY) / 2, z: (maxZ - minZ) / 2 },
     axes: [
       { x: 1, y: 0, z: 0 },
       { x: 0, y: 1, z: 0 },
       { x: 0, y: 0, z: 1 },
     ],
+  }
+}
+
+export function doorSwingRectangle(project: DigitalTwinProject, door: Door): Obb {
+  const inward = wallInward(door.wall)
+  const opening = doorOpeningCenter(project, door)
+  const angle = clampDoorAngle(door.openingAngleDeg)
+  const depth = Math.max(
+    door.width.valueM * Math.sin((angle * Math.PI) / 180),
+    door.swingDepthM,
+  )
+  const width = door.width.valueM
+  const height = door.height.valueM
+  const tangent =
+    door.wall === 'north' || door.wall === 'south'
+      ? { x: 1, y: 0, z: 0 }
+      : { x: 0, y: 0, z: 1 }
+  const center = add(opening, add(scale(inward, depth / 2), { x: 0, y: height / 2, z: 0 }))
+  return {
+    center,
+    halfSize: { x: width / 2, y: height / 2, z: Math.max(depth, 0.02) / 2 },
+    axes: [tangent, { x: 0, y: 1, z: 0 }, inward],
   }
 }
 
@@ -272,9 +346,11 @@ export function furnitureIntersectsDoor(
   transform: TransformDraft,
   door: Door,
 ): boolean {
-  const zone = doorClearanceObb(project, door)
   const movingObb = furnitureToObb(item, transform)
-  if (intersectsObb(movingObb, zone)) return true
+  const parts = [doorLeafObb(project, door), doorSwingRectangle(project, door)]
+  const obstacle = doorObstacleObb(project, door)
+  if (obstacle) parts.push(obstacle)
+  if (parts.some((part) => intersectsObb(movingObb, part))) return true
   return convexPolygonsOverlap(footprintFromObb(movingObb), doorFootprint(project, door))
 }
 
@@ -384,6 +460,39 @@ export function pointInPolygon(point: Point2, polygon: Point2[]): boolean {
     if (crosses) inside = !inside
   }
   return inside
+}
+
+function doorHingeFrame(project: DigitalTwinProject, door: Door) {
+  const inward = wallInward(door.wall)
+  const look = { x: -inward.x, y: 0, z: -inward.z }
+  const left = { x: look.z, y: 0, z: -look.x }
+  const opening = doorOpeningCenter(project, door)
+  const hingeSign = door.hinge === 'left' ? 1 : -1
+  const hinge = add(opening, scale(left, hingeSign * (door.width.valueM / 2)))
+  const closedDir = scale(left, -hingeSign)
+  return { hinge, closedDir, inward, left, opening }
+}
+
+function clampDoorAngle(angle: number): number {
+  return Math.min(180, Math.max(0, angle))
+}
+
+function rotateToward(from: Vec3, toward: Vec3, angle: number): Vec3 {
+  const crossY = from.x * toward.z - from.z * toward.x
+  const sign = crossY >= 0 ? 1 : -1
+  const theta = sign * angle
+  const cos = Math.cos(theta)
+  const sin = Math.sin(theta)
+  return unit({
+    x: from.x * cos - from.z * sin,
+    y: 0,
+    z: from.x * sin + from.z * cos,
+  })
+}
+
+function unit(value: Vec3): Vec3 {
+  const length = Math.hypot(value.x, value.y, value.z) || 1
+  return scale(value, 1 / length)
 }
 
 function orientationAxes(orientation: Orientation3D): [Vec3, Vec3, Vec3] {

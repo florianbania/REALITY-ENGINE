@@ -29,6 +29,7 @@ import type {
   Position3D,
   SunSettings,
 } from '../core/model'
+import { FURNITURE_KINDS, FURNITURE_LABELS, SOURCE_LABELS } from '../core/model'
 import { exportProject, importProject, ProjectFormatError } from '../core/project-io'
 import { formatLength } from '../core/units'
 import {
@@ -56,23 +57,22 @@ const modes: { id: WorkspaceMode; label: string; icon: typeof Ruler }[] = [
   { id: 'scan', label: 'SCAN', icon: ScanLine },
 ]
 
-const furnitureOptions: { kind: FurnitureKind; label: string }[] = [
-  { kind: 'sofa', label: 'Sofa' },
-  { kind: 'table', label: 'Tisch' },
-  { kind: 'chair', label: 'Stuhl' },
-  { kind: 'cabinet', label: 'Schrank' },
-  { kind: 'bed', label: 'Bett' },
-]
+const furnitureOptions: { kind: FurnitureKind; label: string }[] = FURNITURE_KINDS.map(
+  (kind) => ({ kind, label: FURNITURE_LABELS[kind] }),
+)
 
 const FIT_STATUS_COPY: Record<PathCheckResult['status'], [string, string]> = {
   clear: ['Pfad geprüft: frei', 'Kein Hindernis in den geprüften Stützstellen.'],
-  collision: ['Kollision erkannt', 'Eine OBB überschneidet ein anderes Möbelobjekt.'],
+  collision: ['Kollision erkannt', 'Ein Möbelkörper überschneidet ein anderes Objekt.'],
   clearance: [
     'Mindestabstand unterschritten',
     'Keine Berührung, aber der hinterlegte Sicherheitsabstand ist zu klein.',
   ],
   'outside-room': ['Außerhalb des Raums', 'Mindestens eine Ecke verlässt die Raumhülle.'],
-  'door-blocked': ['Türfreizone blockiert', 'Der konservative Türbereich wird geschnitten.'],
+  'door-blocked': [
+    'Türöffnung blockiert',
+    'Türblatt, Schwenkfeld oder ein gemessenes Hindernis in der Öffnung wird geschnitten.',
+  ],
 }
 
 function resultCopy(result: PathCheckResult | null) {
@@ -90,7 +90,7 @@ function resultCopy(result: PathCheckResult | null) {
       : ` Startzustand: ${FIT_STATUS_COPY[result.startStatus][0]}.`
   return {
     title: copy[0],
-    detail: `${copy[1]}${startNote} ${result.checkedSamples} Stützstellen, max. ${Math.round(result.sampleStepM * 100)} cm, Interpolation ${result.interpolation}. Keine Wegsuche.`,
+    detail: `${copy[1]}${startNote} ${result.checkedSamples} Stützstellen, höchstens ${Math.round(result.sampleStepM * 100)} cm Abstand, lineare kürzeste Drehung um die Hochachse. Keine Wegsuche.`,
     tone: result.status === 'clear' ? 'clear' : 'issue',
   }
 }
@@ -130,8 +130,8 @@ function FitTransportPanel({
     <div className="fit-check" data-project={projectId}>
       <h3>Manueller Transportpfad</h3>
       <p className="panel-copy">
-        Linearer kürzester Yaw-Pfad vom aktuellen Zustand zum Ziel – einschließlich Drehung und
-        Kippung. Es findet keine automatische 3D-Wegsuche statt.
+        Gerader Weg vom aktuellen Zustand zum Ziel, inklusive kürzester Drehung um die Hochachse
+        und Kippung. Es wird kein alternativer Weg gesucht.
       </p>
       <div className="transform-grid">
         {(['xM', 'yM', 'zM'] as const).map((axis) => (
@@ -405,6 +405,20 @@ export function Phase2Workspace() {
             </button>
           ))}
         </div>
+        <label className="mobile-project-select">
+          <span>Projekt</span>
+          <select
+            value={project.id}
+            onChange={(event) => store.selectProject(event.target.value)}
+            aria-label="Projekt wählen"
+          >
+            {store.projects.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="save-state"><i />Lokal gespeichert</span>
       </header>
 
@@ -548,7 +562,14 @@ export function Phase2Workspace() {
               <>
                 <div className="object-type">
                   <span className="object-swatch" style={{ background: selected.color }} />
-                  <div><strong>{selected.name}</strong><span>Parametrisch · {selected.kind}</span></div>
+                  <div>
+                    <strong>{selected.name}</strong>
+                    <span>
+                      Parametrisch · {FURNITURE_LABELS[selected.kind]} · Quelle{' '}
+                      {SOURCE_LABELS[selected.dimensions.width.source]} · ±
+                      {Math.round(selected.dimensions.width.uncertaintyM * 1000) / 10} mm
+                    </span>
+                  </div>
                 </div>
                 <h3>Abmessungen</h3>
                 {(['width', 'depth', 'height'] as const).map((key) => (
@@ -606,13 +627,90 @@ export function Phase2Workspace() {
                     onCommit={(value, uncertainty) => store.updateRoomDimension(key, value, uncertainty)}
                   />
                 ))}
+                {project.doors.map((door) => (
+                  <div key={door.id} className="door-editor">
+                    <h3>{door.name}</h3>
+                    <p className="panel-copy">
+                      Leichte Türöffnung: Rahmen, Blatt, Winkel und sichtbare Hindernisse sind
+                      editierbare Maße. FIT prüft Blatt, Schwenkfeld und Hindernis — keine
+                      CAD-Simulation des gesamten Kreisbogens.
+                    </p>
+                    <MeasurementField
+                      label="Lichte Breite"
+                      measurement={door.width}
+                      onCommit={(valueM, uncertaintyM) =>
+                        store.updateDoor(door.id, { width: { valueM, uncertaintyM, source: 'manual' } })
+                      }
+                    />
+                    <MeasurementField
+                      label="Lichte Höhe"
+                      measurement={door.height}
+                      onCommit={(valueM, uncertaintyM) =>
+                        store.updateDoor(door.id, { height: { valueM, uncertaintyM, source: 'manual' } })
+                      }
+                    />
+                    <MeasurementField
+                      label="Rahmenstärke"
+                      measurement={door.frameThickness}
+                      onCommit={(valueM, uncertaintyM) =>
+                        store.updateDoor(door.id, {
+                          frameThickness: { valueM, uncertaintyM, source: 'manual' },
+                        })
+                      }
+                    />
+                    <MeasurementField
+                      label="Türblattstärke"
+                      measurement={door.leafThickness}
+                      onCommit={(valueM, uncertaintyM) =>
+                        store.updateDoor(door.id, {
+                          leafThickness: { valueM, uncertaintyM, source: 'manual' },
+                        })
+                      }
+                    />
+                    <MeasurementField
+                      label="Sichtbares Hindernis (Tiefe)"
+                      measurement={door.visibleObstacle}
+                      allowZero
+                      onCommit={(valueM, uncertaintyM) =>
+                        store.updateDoor(door.id, {
+                          visibleObstacle: { valueM, uncertaintyM, source: 'manual' },
+                        })
+                      }
+                    />
+                    <label className="range-field">
+                      Öffnungswinkel <strong>{Math.round(door.openingAngleDeg)}°</strong>
+                      <input
+                        type="range"
+                        min="0"
+                        max="180"
+                        step="1"
+                        value={door.openingAngleDeg}
+                        onChange={(event) =>
+                          store.updateDoor(door.id, {
+                            openingAngleDeg: Number(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="text-field">
+                      Anschlag (von innen)
+                      <select
+                        value={door.hinge}
+                        onChange={(event) =>
+                          store.updateDoor(door.id, {
+                            hinge: event.target.value === 'right' ? 'right' : 'left',
+                          })
+                        }
+                      >
+                        <option value="left">Links</option>
+                        <option value="right">Rechts</option>
+                      </select>
+                    </label>
+                  </div>
+                ))}
                 <div className="door-summary">
-                  <strong>
-                    {project.doors.length} Türfreizone · {project.openings.length} Öffnungen
-                  </strong>
-                  <span>
-                    Türen: konservatives Rechteck. Fenster sind Lichtwege, keine Wetterannahme.
-                  </span>
+                  <strong>{project.openings.length} Fenster/Öffnungen</strong>
+                  <span>Lichtwege ohne Wetterannahme. Quelle der Türmaße: {SOURCE_LABELS[project.doors[0]?.width.source ?? 'manual']}.</span>
                 </div>
               </>
             )}

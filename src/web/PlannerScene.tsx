@@ -10,7 +10,7 @@ import {
   TransformControls,
 } from '@react-three/drei'
 import { Suspense } from 'react'
-import { MathUtils, type Object3D } from 'three'
+import { Euler, Matrix4, MathUtils, Vector3, type Object3D } from 'three'
 import type {
   DigitalTwinProject,
   FurnitureObject,
@@ -18,7 +18,13 @@ import type {
   Position3D,
 } from '../core/model'
 import type { Point2 } from '../simulation/collision'
-import { doorClearanceObb, openingApertureObb } from '../simulation/collision'
+import {
+  doorClearanceObb,
+  doorLeafObb,
+  doorOpeningCenter,
+  openingApertureObb,
+  wallInward,
+} from '../simulation/collision'
 import type { SunResult } from '../simulation/sun'
 import type { WorkspaceMode } from './store'
 
@@ -38,6 +44,16 @@ interface PlannerSceneProps {
   onMeasurePoint: (point: Point2) => void
   onSelect: (id: string | null) => void
   onTransform: (id: string, position: Position3D, orientation: Orientation3D) => void
+}
+
+function eulerFromAxes(axes: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }, { x: number; y: number; z: number }]): [number, number, number] {
+  const matrix = new Matrix4().makeBasis(
+    new Vector3(axes[0].x, axes[0].y, axes[0].z),
+    new Vector3(axes[1].x, axes[1].y, axes[1].z),
+    new Vector3(axes[2].x, axes[2].y, axes[2].z),
+  )
+  const euler = new Euler().setFromRotationMatrix(matrix)
+  return [euler.x, euler.y, euler.z]
 }
 
 function FurnitureMaterial({
@@ -141,6 +157,69 @@ function Furniture({
           {material}
         </mesh>
       )}
+      {item.kind === 'armchair' && (
+        <>
+          <mesh {...meshProps} position={[0, h * 0.28, 0]} scale={[w, h * 0.38, d]}>
+            <boxGeometry />
+            {material}
+          </mesh>
+          <mesh {...meshProps} position={[0, h * 0.66, d * 0.34]} scale={[w, h * 0.52, d * 0.22]}>
+            <boxGeometry />
+            {material}
+          </mesh>
+        </>
+      )}
+      {item.kind === 'desk' && (
+        <>
+          <mesh {...meshProps} position={[0, h * 0.92, 0]} scale={[w, h * 0.08, d]}>
+            <boxGeometry />
+            {material}
+          </mesh>
+          {[-1, 1].map((x) => (
+            <mesh
+              {...meshProps}
+              key={x}
+              position={[x * w * 0.44, h * 0.46, 0]}
+              scale={[0.05, h * 0.9, d * 0.92]}
+            >
+              <boxGeometry />
+              {material}
+            </mesh>
+          ))}
+        </>
+      )}
+      {item.kind === 'sideboard' && (
+        <mesh {...meshProps} position={[0, h / 2, 0]} scale={[w, h, d]}>
+          <boxGeometry />
+          {material}
+        </mesh>
+      )}
+      {item.kind === 'shelf' && (
+        <>
+          {[-1, 1].map((x) => (
+            <mesh
+              {...meshProps}
+              key={x}
+              position={[x * w * 0.46, h / 2, 0]}
+              scale={[0.04, h, d]}
+            >
+              <boxGeometry />
+              {material}
+            </mesh>
+          ))}
+          {[0.12, 0.4, 0.68, 0.94].map((y) => (
+            <mesh
+              {...meshProps}
+              key={y}
+              position={[0, h * y, 0]}
+              scale={[w, 0.03, d]}
+            >
+              <boxGeometry />
+              {material}
+            </mesh>
+          ))}
+        </>
+      )}
       {item.kind === 'bed' && (
         <>
           <mesh {...meshProps} position={[0, h * 0.25, 0]} scale={[w, h * 0.5, d]}>
@@ -152,6 +231,12 @@ function Furniture({
             {material}
           </mesh>
         </>
+      )}
+      {item.kind === 'nightstand' && (
+        <mesh {...meshProps} position={[0, h / 2, 0]} scale={[w, h, d]}>
+          <boxGeometry />
+          {material}
+        </mesh>
       )}
     </group>
   )
@@ -287,15 +372,50 @@ function Scene(props: PlannerSceneProps) {
 
       {project.doors.map((door) => {
         const zone = doorClearanceObb(project, door)
+        const leaf = doorLeafObb(project, door)
+        const opening = doorOpeningCenter(project, door)
+        const inward = wallInward(door.wall)
+        const frame = door.frameThickness.valueM
+        const tangent =
+          door.wall === 'north' || door.wall === 'south'
+            ? { x: 1, y: 0, z: 0 }
+            : { x: 0, y: 0, z: 1 }
         return (
-          <mesh
-            key={door.id}
-            position={[zone.center.x, 0.018, zone.center.z]}
-            rotation={[-Math.PI / 2, 0, 0]}
-          >
-            <planeGeometry args={[zone.halfSize.x * 2, zone.halfSize.z * 2]} />
-            <meshBasicMaterial color="#efb45f" transparent opacity={0.2} depthWrite={false} />
-          </mesh>
+          <group key={door.id}>
+            <mesh
+              position={[zone.center.x, 0.018, zone.center.z]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <planeGeometry args={[zone.halfSize.x * 2, zone.halfSize.z * 2]} />
+              <meshBasicMaterial color="#efb45f" transparent opacity={0.16} depthWrite={false} />
+            </mesh>
+            {[-1, 1].map((side) => (
+              <mesh
+                key={side}
+                position={[
+                  opening.x + tangent.x * (door.width.valueM / 2 + frame / 2) * side + inward.x * 0.03,
+                  door.height.valueM / 2,
+                  opening.z + tangent.z * (door.width.valueM / 2 + frame / 2) * side + inward.z * 0.03,
+                ]}
+              >
+                <boxGeometry args={[
+                  door.wall === 'east' || door.wall === 'west' ? frame : frame,
+                  door.height.valueM,
+                  door.wall === 'north' || door.wall === 'south' ? frame : frame,
+                ]} />
+                <meshStandardMaterial color="#c4b7a2" roughness={0.85} />
+              </mesh>
+            ))}
+            <mesh
+              position={[leaf.center.x, leaf.center.y, leaf.center.z]}
+              rotation={eulerFromAxes(leaf.axes)}
+            >
+              <boxGeometry
+                args={[leaf.halfSize.x * 2, leaf.halfSize.y * 2, leaf.halfSize.z * 2]}
+              />
+              <meshStandardMaterial color="#d8c3a2" roughness={0.7} />
+            </mesh>
+          </group>
         )
       })}
 

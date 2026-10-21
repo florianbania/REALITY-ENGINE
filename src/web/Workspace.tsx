@@ -14,7 +14,7 @@ import {
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { importProject, exportProject, ProjectFormatError } from '../core/project-io'
-import type { FurnitureKind, Position3D } from '../core/model'
+import { FURNITURE_KINDS, FURNITURE_LABELS, type FurnitureKind, type Position3D } from '../core/model'
 import { formatLength } from '../core/units'
 import { calculateSpaceMetrics } from '../simulation/space-metrics'
 import { MeasurementField } from './MeasurementField'
@@ -27,13 +27,9 @@ const modes: { id: WorkspaceMode; label: string; icon: typeof Ruler }[] = [
   { id: 'space', label: 'SPACE', icon: Layers3 },
 ]
 
-const furnitureOptions: { kind: FurnitureKind; label: string }[] = [
-  { kind: 'sofa', label: 'Sofa' },
-  { kind: 'table', label: 'Tisch' },
-  { kind: 'chair', label: 'Stuhl' },
-  { kind: 'cabinet', label: 'Schrank' },
-  { kind: 'bed', label: 'Bett' },
-]
+const furnitureOptions: { kind: FurnitureKind; label: string }[] = FURNITURE_KINDS.map(
+  (kind) => ({ kind, label: FURNITURE_LABELS[kind] }),
+)
 
 export function Workspace() {
   const store = useProjectStore()

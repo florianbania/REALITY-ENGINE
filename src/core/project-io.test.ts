@@ -9,7 +9,7 @@ describe('Projekt Import und Export', () => {
     const imported = importProject(serialized)
 
     expect(imported).toEqual(project)
-    expect(serialized).toContain('"schemaVersion": 4')
+    expect(serialized).toContain('"schemaVersion": 5')
   })
 
   it('migriert Phase-1-Projekte ohne erfundene Messwerte', () => {
@@ -29,7 +29,8 @@ describe('Projekt Import und Export', () => {
     delete v1.sun
     delete v1.openings
     const imported = importProject(JSON.stringify(v1))
-    expect(imported.schemaVersion).toBe(4)
+    expect(imported.schemaVersion).toBe(5)
+    expect(imported.doors).toEqual([])
     expect(imported.lastScan).toBeNull()
     expect(imported.openings).toEqual([])
     expect(imported.doors).toEqual([])
@@ -43,6 +44,24 @@ describe('Projekt Import und Export', () => {
     expect(imported.furniture[0].minimumClearanceM).toBe(0.05)
   })
 
+  it('migriert v4-Türen auf Rahmen, Blatt und Winkel', () => {
+    const v4 = createSeedProject() as unknown as Record<string, unknown>
+    const doors = (v4.doors as Array<Record<string, unknown>>).map((door) => {
+      const rest = { ...door }
+      delete rest.frameThickness
+      delete rest.leafThickness
+      delete rest.openingAngleDeg
+      delete rest.hinge
+      delete rest.visibleObstacle
+      return rest
+    })
+    const imported = importProject(JSON.stringify({ ...v4, schemaVersion: 4, doors }))
+    expect(imported.schemaVersion).toBe(5)
+    expect(imported.doors[0].openingAngleDeg).toBe(90)
+    expect(imported.doors[0].frameThickness.valueM).toBe(0.06)
+    expect(imported.doors[0].visibleObstacle.valueM).toBe(0)
+  })
+
   it('weist beschädigtes JSON mit verständlichem Fehler zurück', () => {
     expect(() => importProject('{oops')).toThrow(ProjectFormatError)
     try {
@@ -53,7 +72,7 @@ describe('Projekt Import und Export', () => {
   })
 
   it('weist unbekannte künftige Schemaversionen zurück', () => {
-    const future = { ...createSeedProject(), schemaVersion: 5 }
+    const future = { ...createSeedProject(), schemaVersion: 6 }
     expect(() => importProject(JSON.stringify(future))).toThrow(/nicht unterstützt/)
   })
 

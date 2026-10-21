@@ -15,9 +15,11 @@ export const ROOMPLAN_DEFAULT_UNCERTAINTY_M = 0.05
 const CATEGORY_TO_KIND: Record<string, FurnitureKind> = {
   sofa: 'sofa',
   couch: 'sofa',
+  armchair: 'armchair',
   table: 'table',
   diningtable: 'table',
   coffeetable: 'table',
+  desk: 'desk',
   chair: 'chair',
   stool: 'chair',
   storage: 'cabinet',
@@ -25,7 +27,14 @@ const CATEGORY_TO_KIND: Record<string, FurnitureKind> = {
   refrigerator: 'cabinet',
   dishwasher: 'cabinet',
   oven: 'cabinet',
+  sideboard: 'sideboard',
+  dresser: 'sideboard',
+  shelf: 'shelf',
+  shelvingunit: 'shelf',
+  bookshelf: 'shelf',
   bed: 'bed',
+  nightstand: 'nightstand',
+  sidetable: 'nightstand',
 }
 
 export function isRoomPlanLike(value: unknown): boolean {

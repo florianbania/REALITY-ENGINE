@@ -23,27 +23,25 @@ npm test
 npm run build
 ```
 
-## Simulatoren (nachgehärtet)
+## Alltagstauglichkeit
 
-- **FIT:** lineare Interpolation inkl. kürzestem Yaw, 2-cm-Stützstellen,
-  Startzustand und Ergebniszustände (`clear`, `collision`, `clearance`,
-  `outside-room`, `door-blocked`). Keine automatische 3D-Wegsuche.
-- **SUN:** Raum-Nord ist −Z plus `northOffsetDeg`. Fenster/Öffnungen sind
-  Lichtwege, wenn der Lichtvektor die Innen-Normale trifft. Kein Wetter.
-- **SPACE:** OBB-Kollisionen, Türblockierung (3D-OBB oder 2D-Grundriss),
-  freie Bodenfläche als Union geclippter Fußabdrücke auf einem 1-cm-Raster.
+- Deutsche Ergebnistexte, Quelle und Unsicherheit an jedem Maß, Tablet- und
+  Mobil-Layout mit Projektwahl und größeren Tippszielen.
+- Parametrische Möbelbibliothek: Sofa, Sessel, Tisch, Schreibtisch, Stuhl,
+  Schrank, Sideboard, Regal, Bett, Nachttisch. Keine fotorealistischen Surfaces.
+- Leichte Türöffnung im gemeinsamen Modell (Schema v5): Rahmenstärke, Blatt,
+  Öffnungswinkel, Anschlag, sichtbares Hindernis. FIT prüft Blatt, Schwenkfeld
+  und Hindernis — kein voller CAD-Kreisbogen, keine Wegsuche.
 
-## Scan / Pose
+## Simulatoren
 
-RoomPlan-ähnliches JSON übernimmt Maße und, soweit die 4×4-Matrix lesbar ist,
-Pose relativ zum Floor-Ursprung. Fehlende Unsicherheit bleibt die dokumentierte
-Annahme 0,05 m. Kein nativer Scan.
+- **FIT:** lineare Interpolation inkl. kürzester Hochachsendrehung, 2-cm-Stützstellen.
+- **SUN:** Raum-Nord −Z plus Offset; Fenster als Lichtwege. Kein Wetter.
+- **SPACE:** 1-cm-Raster, Kollisionen, Türblockierung.
 
-## Bekannte Einschränkungen
+## Grenzen
 
-- Kein Live-LiDAR, keine Kamera, kein Object Capture, keine Mesh-Bounding-Box.
-- FIT interpoliert nur die Gerade (plus Yaw/Tilt); Umwege werden nicht gesucht.
-- SPACE ist ein Raster, kein CAD-Boolean. 1 cm ist die Diskretisierung.
-- SUN kennt keine Bewölkung, kein Gelände, keine Nachbarhäuser, keine Glasoptik.
-- Pose ohne lesbare Transform wird übersprungen, nicht erfunden.
-- Speicherung nur lokal (Projekt-Schema v4 inkl. `openings`).
+- Kein nativer Scan, keine Kamera, kein LiDAR, kein Object Capture.
+- Keine automatische 3D-Wegsuche und keine Millimeter-Garantie.
+- Türschwenk ist Rechteck plus Blatt-OBB, kein exakter Kreisring.
+- Speicherung nur lokal.

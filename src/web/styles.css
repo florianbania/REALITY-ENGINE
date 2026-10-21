@@ -1336,6 +1336,40 @@ input:focus-visible {
   line-height: 1.4;
 }
 
+.door-editor {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.source-chip--scan {
+  color: #7ee0c8;
+  border-color: rgba(126, 224, 200, 0.3);
+}
+
+.source-chip--import {
+  color: #e0c07e;
+  border-color: rgba(224, 192, 126, 0.3);
+}
+
+.mobile-project-select {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: #7d8f9e;
+  font-size: 10px;
+}
+
+.mobile-project-select select {
+  min-height: 40px;
+  min-width: 140px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #101a28;
+  color: #edf7fb;
+}
+
 .sun-settings__grid {
   display: grid;
   gap: 9px;
@@ -1629,20 +1663,29 @@ input:focus-visible {
     position: sticky;
     z-index: 10;
     top: 0;
-    grid-template-columns: 40px 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-auto-rows: minmax(48px, auto);
   }
 
   .workspace-brand {
     display: none;
   }
 
+  .mobile-project-select {
+    display: flex;
+    grid-column: 1 / -1;
+    padding: 0 10px 8px;
+  }
+
   .mode-tabs {
     justify-content: flex-start;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .mode-tabs button {
-    min-width: 74px;
+    min-width: 88px;
+    min-height: 44px;
   }
 
   .workspace-grid {
@@ -1655,18 +1698,28 @@ input:focus-visible {
   }
 
   .viewport {
-    height: 64vh;
-    min-height: 480px;
+    height: 52vh;
+    min-height: 360px;
   }
 
   .inspector {
-    min-height: 500px;
+    min-height: 420px;
     border-top: 1px solid var(--line);
     border-left: 0;
   }
 
   .inspector-scroll {
     overflow: visible;
+    padding-bottom: 28px;
+  }
+
+  .primary-action,
+  .secondary-action {
+    min-height: 44px;
+  }
+
+  .add-menu button {
+    min-height: 40px;
   }
 }
 
