@@ -6,7 +6,9 @@ describe('versionierter digitaler Zwilling', () => {
     const project = createSeedProject()
 
     expect(project.schema).toBe('reality-engine/project')
-    expect(project.schemaVersion).toBe(1)
+    expect(project.schemaVersion).toBe(2)
+    expect(project.doors).toHaveLength(1)
+    expect(project.sun.timeZone).toBe('Europe/Berlin')
     expect(project.room.dimensions.width.valueM).toBe(5.2)
     expect(project.room.dimensions.width.source).toBe('manual')
     expect(project.room.dimensions.width.uncertaintyM).toBe(0.01)
@@ -46,6 +48,7 @@ describe('versionierter digitaler Zwilling', () => {
     expect(next.furniture[0].dimensions.depth.valueM).toBe(1.05)
     expect(next.furniture[1]).toBe(untouched)
     expect(project.furniture[0].dimensions.depth.valueM).toBe(0.9)
+    expect(next.furniture[0].orientation.tiltXDeg).toBe(0)
   })
 
   it('verhindert unmögliche Messwerte und unbekannte Ziele', () => {

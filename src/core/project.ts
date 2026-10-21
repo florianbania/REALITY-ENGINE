@@ -39,10 +39,28 @@ export function createStarterProject(now = new Date().toISOString()): DigitalTwi
         depth: measured(4.1),
       },
     },
-    furniture: [
-      createFurniture('sofa', 'Sofa', { xM: -0.8, yM: 0, zM: 0.85 }, now),
-      createFurniture('table', 'Couchtisch', { xM: 0.65, yM: 0, zM: 0.45 }, now),
+    doors: [
+      {
+        id: crypto.randomUUID(),
+        name: 'Zimmertür',
+        wall: 'south',
+        offsetM: -1.35,
+        width: measured(0.9),
+        height: measured(2.01),
+        swingDepthM: 0.9,
+      },
     ],
+    furniture: [
+      createFurniture('sofa', 'Sofa', { xM: 0.2, yM: 0, zM: -0.9 }, now),
+      createFurniture('table', 'Couchtisch', { xM: 0.8, yM: 0, zM: 0.55 }, now),
+    ],
+    sun: {
+      latitude: 52.52,
+      longitude: 13.405,
+      timeZone: 'Europe/Berlin',
+      northOffsetDeg: 0,
+      localDateTime: '2026-06-21T14:00',
+    },
   }
 }
 
@@ -71,7 +89,12 @@ export function createFurniture(
       depth: measured(depth),
     },
     position,
-    rotationYDeg: 0,
+    orientation: {
+      rotationYDeg: 0,
+      tiltXDeg: 0,
+      tiltZDeg: 0,
+    },
+    minimumClearanceM: 0.05,
     color,
   }
 }

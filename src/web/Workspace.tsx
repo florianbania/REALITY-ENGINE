@@ -302,7 +302,7 @@ export function Workspace() {
                     <input
                       type="number"
                       step="5"
-                      value={selected.rotationYDeg}
+                      value={selected.orientation.rotationYDeg}
                       onChange={(event) =>
                         store.updateFurnitureRotation(selected.id, Number(event.target.value))
                       }

@@ -5,8 +5,11 @@ import type {
   DimensionKey,
   FurnitureKind,
   MeasurementSource,
+  Orientation3D,
   Position3D,
+  SunSettings,
 } from '../core/model'
+import { migrateProjectValue, validateProject } from '../core/project-io'
 import {
   createFurniture,
   createStarterProject,
@@ -34,6 +37,7 @@ interface ProjectState {
   selectFurniture: (id: string | null) => void
   addFurniture: (kind: FurnitureKind) => void
   removeFurniture: (id: string) => void
+  duplicateFurniture: (id: string) => void
   updateRoomDimension: (
     dimension: DimensionKey,
     valueM: number,
@@ -49,6 +53,14 @@ interface ProjectState {
   ) => void
   updateFurniturePosition: (id: string, position: Position3D) => void
   updateFurnitureRotation: (id: string, rotationYDeg: number) => void
+  updateFurnitureOrientation: (id: string, orientation: Orientation3D) => void
+  updateFurnitureTransform: (
+    id: string,
+    position: Position3D,
+    orientation: Orientation3D,
+  ) => void
+  updateFurnitureClearance: (id: string, minimumClearanceM: number) => void
+  updateSunSettings: (settings: Partial<SunSettings>) => void
 }
 
 const initialProject = createStarterProject()
@@ -147,6 +159,36 @@ export const useProjectStore = create<ProjectState>()(
           })),
           selectedFurnitureId: state.selectedFurnitureId === id ? null : state.selectedFurnitureId,
         })),
+      duplicateFurniture: (id) => {
+        const source = get()
+          .projects.find((project) => project.id === get().activeProjectId)
+          ?.furniture.find((item) => item.id === id)
+        if (!source) return
+        const duplicate = {
+          ...source,
+          id: crypto.randomUUID(),
+          name: `${source.name} Kopie`,
+          position: {
+            ...source.position,
+            xM: source.position.xM + 0.25,
+            zM: source.position.zM + 0.25,
+          },
+          dimensions: {
+            width: { ...source.dimensions.width },
+            height: { ...source.dimensions.height },
+            depth: { ...source.dimensions.depth },
+          },
+          orientation: { ...source.orientation },
+        }
+        set((state) => ({
+          ...updateActive(state, (project) => ({
+            ...project,
+            furniture: [...project.furniture, duplicate],
+            updatedAt: new Date().toISOString(),
+          })),
+          selectedFurnitureId: duplicate.id,
+        }))
+      },
       updateRoomDimension: (dimension, valueM, uncertaintyM, source = 'manual') =>
         set((state) =>
           updateActive(state, (project) =>
@@ -188,14 +230,76 @@ export const useProjectStore = create<ProjectState>()(
             ...project,
             updatedAt: new Date().toISOString(),
             furniture: project.furniture.map((item) =>
-              item.id === id ? { ...item, rotationYDeg } : item,
+              item.id === id
+                ? {
+                    ...item,
+                    orientation: { ...item.orientation, rotationYDeg },
+                  }
+                : item,
             ),
+          })),
+        ),
+      updateFurnitureOrientation: (id, orientation) =>
+        set((state) =>
+          updateActive(state, (project) => ({
+            ...project,
+            updatedAt: new Date().toISOString(),
+            furniture: project.furniture.map((item) =>
+              item.id === id ? { ...item, orientation } : item,
+            ),
+          })),
+        ),
+      updateFurnitureTransform: (id, position, orientation) =>
+        set((state) =>
+          updateActive(state, (project) => ({
+            ...project,
+            updatedAt: new Date().toISOString(),
+            furniture: project.furniture.map((item) =>
+              item.id === id ? { ...item, position, orientation } : item,
+            ),
+          })),
+        ),
+      updateFurnitureClearance: (id, minimumClearanceM) =>
+        set((state) =>
+          updateActive(state, (project) => ({
+            ...project,
+            updatedAt: new Date().toISOString(),
+            furniture: project.furniture.map((item) =>
+              item.id === id ? { ...item, minimumClearanceM } : item,
+            ),
+          })),
+        ),
+      updateSunSettings: (settings) =>
+        set((state) =>
+          updateActive(state, (project) => ({
+            ...project,
+            updatedAt: new Date().toISOString(),
+            sun: { ...project.sun, ...settings },
           })),
         ),
     }),
     {
       name: 'reality-engine-projects-v1',
-      version: 1,
+      version: 2,
+      migrate: (persistedState) => {
+        const persisted = persistedState as Partial<ProjectState>
+        const migratedProjects = (persisted.projects ?? [])
+          .map((project) => {
+            try {
+              return validateProject(migrateProjectValue(project))
+            } catch {
+              return null
+            }
+          })
+          .filter((project): project is DigitalTwinProject => project !== null)
+        const projects = migratedProjects.length > 0 ? migratedProjects : [initialProject]
+        const activeProjectId = projects.some(
+          (project) => project.id === persisted.activeProjectId,
+        )
+          ? persisted.activeProjectId!
+          : projects[0].id
+        return { ...persisted, projects, activeProjectId }
+      },
       partialize: (state) => ({
         projects: state.projects,
         activeProjectId: state.activeProjectId,
@@ -206,6 +310,8 @@ export const useProjectStore = create<ProjectState>()(
 
 export function getActiveProject(state: ProjectState): DigitalTwinProject {
   return (
-    state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0]
+    state.projects.find((project) => project.id === state.activeProjectId) ??
+    state.projects[0] ??
+    initialProject
   )
 }

@@ -42,7 +42,11 @@ function FurnitureMesh({
   return (
     <group
       position={[item.position.xM, item.position.yM, item.position.zM]}
-      rotation={[0, (item.rotationYDeg * Math.PI) / 180, 0]}
+      rotation={[
+        (item.orientation.tiltXDeg * Math.PI) / 180,
+        (item.orientation.rotationYDeg * Math.PI) / 180,
+        (item.orientation.tiltZDeg * Math.PI) / 180,
+      ]}
     >
       {item.kind === 'sofa' && (
         <>

@@ -3,7 +3,7 @@ import { Landing } from './Landing'
 import { useProjectStore } from './store'
 
 const Workspace = lazy(() =>
-  import('./Workspace').then((module) => ({ default: module.Workspace })),
+  import('./Phase2Workspace').then((module) => ({ default: module.Phase2Workspace })),
 )
 
 export function App() {

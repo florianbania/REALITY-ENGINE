@@ -71,7 +71,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
       <section className="hero">
         <div className="eyebrow">
           <span />
-          Digitaler Zwilling · Phase 01
+          Digitaler Zwilling · Phase 02
         </div>
         <h1>
           Räume verstehen.
@@ -102,7 +102,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="02"
           title="SUN"
           description="Licht im Raum erleben."
-          detail="Sonnenstand-Vorschau"
+          detail="SunCalc & Schatten"
           icon={<Sun size={28} />}
           onClick={() => onEnter('sun')}
         />
@@ -110,7 +110,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="03"
           title="SPACE"
           description="Fläche bewusst nutzen."
-          detail="Geometrische Kennzahlen"
+          detail="Grundriss & 3D-Planer"
           icon={<Boxes size={28} />}
           onClick={() => onEnter('space')}
         />

@@ -9,7 +9,35 @@ describe('Projekt Import und Export', () => {
     const imported = importProject(serialized)
 
     expect(imported).toEqual(project)
-    expect(serialized).toContain('"schemaVersion": 1')
+    expect(serialized).toContain('"schemaVersion": 2')
+  })
+
+  it('migriert Phase-1-Projekte ohne erfundene Messwerte', () => {
+    const legacy = createSeedProject() as unknown as Record<string, unknown>
+    const furniture = (legacy.furniture as Array<Record<string, unknown>>).map((item) => {
+      const rest = { ...item }
+      delete rest.orientation
+      delete rest.minimumClearanceM
+      return { ...rest, rotationYDeg: 45 }
+    })
+    const v1 = {
+      ...legacy,
+      schemaVersion: 1,
+      furniture,
+    } as Record<string, unknown>
+    delete v1.doors
+    delete v1.sun
+    const imported = importProject(JSON.stringify(v1))
+    expect(imported.schemaVersion).toBe(2)
+    expect(imported.doors).toEqual([])
+    expect(imported.sun.timeZone).toBe('UTC')
+    expect(imported.sun.latitude).toBe(0)
+    expect(imported.furniture[0].orientation).toEqual({
+      rotationYDeg: 45,
+      tiltXDeg: 0,
+      tiltZDeg: 0,
+    })
+    expect(imported.furniture[0].minimumClearanceM).toBe(0.05)
   })
 
   it('weist beschädigtes JSON mit verständlichem Fehler zurück', () => {
@@ -22,7 +50,7 @@ describe('Projekt Import und Export', () => {
   })
 
   it('weist unbekannte künftige Schemaversionen zurück', () => {
-    const future = { ...createSeedProject(), schemaVersion: 2 }
+    const future = { ...createSeedProject(), schemaVersion: 3 }
     expect(() => importProject(JSON.stringify(future))).toThrow(/nicht unterstützt/)
   })
 

@@ -2,13 +2,17 @@ import {
   PROJECT_SCHEMA,
   PROJECT_SCHEMA_VERSION,
   type DigitalTwinProject,
+  type Door,
   type Dimensions,
   type FurnitureKind,
   type FurnitureObject,
   type Measurement,
   type MeasurementSource,
+  type Orientation3D,
   type Position3D,
   type Room,
+  type SunSettings,
+  type WallSide,
 } from './model'
 
 export class ProjectFormatError extends Error {
@@ -30,7 +34,7 @@ export function importProject(source: string): DigitalTwinProject {
   } catch {
     throw new ProjectFormatError(['Die Datei enthält kein gültiges JSON.'])
   }
-  return validateProject(value)
+  return validateProject(migrateProjectValue(value))
 }
 
 export function validateProject(value: unknown): DigitalTwinProject {
@@ -45,6 +49,9 @@ export function validateProject(value: unknown): DigitalTwinProject {
   }
 
   const room = parseRoom(root.room, '$.room', issues)
+  const doors = Array.isArray(root.doors)
+    ? root.doors.map((item, index) => parseDoor(item, `$.doors[${index}]`, issues))
+    : (issues.push('$.doors muss eine Liste sein.'), [])
   const furniture = Array.isArray(root.furniture)
     ? root.furniture.map((item, index) => parseFurniture(item, `$.furniture[${index}]`, issues))
     : (issues.push('$.furniture muss eine Liste sein.'), [])
@@ -57,11 +64,55 @@ export function validateProject(value: unknown): DigitalTwinProject {
     createdAt: isoDate(root.createdAt, '$.createdAt', issues),
     updatedAt: isoDate(root.updatedAt, '$.updatedAt', issues),
     room,
+    doors,
     furniture,
+    sun: parseSunSettings(root.sun, '$.sun', issues),
   } satisfies DigitalTwinProject
 
   if (issues.length > 0) throw new ProjectFormatError(issues)
   return project
+}
+
+/**
+ * Pure migration used by file imports and Zustand persistence. V1 contained no
+ * doors, site data, tilt or object clearances; no sensor values are invented.
+ */
+export function migrateProjectValue(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value
+  const root = value as Record<string, unknown>
+  if (root.schema !== PROJECT_SCHEMA || root.schemaVersion !== 1) return value
+  const furniture = Array.isArray(root.furniture)
+    ? root.furniture.map((entry) => {
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry
+        const item = entry as Record<string, unknown>
+        return {
+          ...item,
+          orientation: {
+            rotationYDeg:
+              typeof item.rotationYDeg === 'number' && Number.isFinite(item.rotationYDeg)
+                ? item.rotationYDeg
+                : 0,
+            tiltXDeg: 0,
+            tiltZDeg: 0,
+          },
+          minimumClearanceM: 0.05,
+          rotationYDeg: undefined,
+        }
+      })
+    : root.furniture
+  return {
+    ...root,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    doors: [],
+    furniture,
+    sun: {
+      latitude: 0,
+      longitude: 0,
+      timeZone: 'UTC',
+      northOffsetDeg: 0,
+      localDateTime: '2026-06-21T12:00',
+    },
+  }
 }
 
 function parseRoom(value: unknown, path: string, issues: string[]): Room {
@@ -85,9 +136,56 @@ function parseFurniture(value: unknown, path: string, issues: string[]): Furnitu
     kind,
     dimensions: parseDimensions(item.dimensions, `${path}.dimensions`, issues),
     position: parsePosition(item.position, `${path}.position`, issues),
-    rotationYDeg: finiteNumber(item.rotationYDeg, `${path}.rotationYDeg`, issues),
+    orientation: parseOrientation(item.orientation, `${path}.orientation`, issues),
+    minimumClearanceM: nonNegativeNumber(
+      item.minimumClearanceM,
+      `${path}.minimumClearanceM`,
+      issues,
+    ),
     color: text(item.color, `${path}.color`, issues),
   }
+}
+
+function parseDoor(value: unknown, path: string, issues: string[]): Door {
+  const item = record(value, path, issues)
+  const walls: WallSide[] = ['north', 'east', 'south', 'west']
+  const wall = walls.includes(item.wall as WallSide)
+    ? (item.wall as WallSide)
+    : (issues.push(`${path}.wall ist unbekannt.`), 'south')
+  return {
+    id: text(item.id, `${path}.id`, issues),
+    name: text(item.name, `${path}.name`, issues),
+    wall,
+    offsetM: finiteNumber(item.offsetM, `${path}.offsetM`, issues),
+    width: parseMeasurement(item.width, `${path}.width`, issues),
+    height: parseMeasurement(item.height, `${path}.height`, issues),
+    swingDepthM: positiveNumber(item.swingDepthM, `${path}.swingDepthM`, issues),
+  }
+}
+
+function parseSunSettings(value: unknown, path: string, issues: string[]): SunSettings {
+  const item = record(value, path, issues)
+  const latitude = finiteNumber(item.latitude, `${path}.latitude`, issues)
+  const longitude = finiteNumber(item.longitude, `${path}.longitude`, issues)
+  const northOffsetDeg = finiteNumber(
+    item.northOffsetDeg,
+    `${path}.northOffsetDeg`,
+    issues,
+  )
+  if (latitude < -90 || latitude > 90) issues.push(`${path}.latitude liegt außerhalb ±90°.`)
+  if (longitude < -180 || longitude > 180)
+    issues.push(`${path}.longitude liegt außerhalb ±180°.`)
+  const timeZone = text(item.timeZone, `${path}.timeZone`, issues)
+  try {
+    new Intl.DateTimeFormat('de-DE', { timeZone }).format()
+  } catch {
+    issues.push(`${path}.timeZone ist keine gültige IANA-Zeitzone.`)
+  }
+  const localDateTime = text(item.localDateTime, `${path}.localDateTime`, issues)
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(localDateTime)) {
+    issues.push(`${path}.localDateTime muss YYYY-MM-DDTHH:mm entsprechen.`)
+  }
+  return { latitude, longitude, timeZone, northOffsetDeg, localDateTime }
 }
 
 function parseDimensions(value: unknown, path: string, issues: string[]): Dimensions {
@@ -125,6 +223,15 @@ function parsePosition(value: unknown, path: string, issues: string[]): Position
   }
 }
 
+function parseOrientation(value: unknown, path: string, issues: string[]): Orientation3D {
+  const item = record(value, path, issues)
+  return {
+    rotationYDeg: finiteNumber(item.rotationYDeg, `${path}.rotationYDeg`, issues),
+    tiltXDeg: finiteNumber(item.tiltXDeg, `${path}.tiltXDeg`, issues),
+    tiltZDeg: finiteNumber(item.tiltZDeg, `${path}.tiltZDeg`, issues),
+  }
+}
+
 function record(value: unknown, path: string, issues: string[]): Record<string, unknown> {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>
@@ -148,6 +255,12 @@ function finiteNumber(value: unknown, path: string, issues: string[]): number {
 function positiveNumber(value: unknown, path: string, issues: string[]): number {
   const result = finiteNumber(value, path, issues)
   if (result <= 0) issues.push(`${path} muss größer als 0 sein.`)
+  return result
+}
+
+function nonNegativeNumber(value: unknown, path: string, issues: string[]): number {
+  const result = finiteNumber(value, path, issues)
+  if (result < 0) issues.push(`${path} darf nicht negativ sein.`)
   return result
 }
 

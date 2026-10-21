@@ -509,7 +509,7 @@ input:focus-visible {
 .workspace-grid {
   display: grid;
   height: calc(100vh - 68px);
-  grid-template-columns: 210px minmax(420px, 1fr) 304px;
+  grid-template-columns: 200px minmax(420px, 1fr) 360px;
 }
 
 .project-rail,
@@ -1102,6 +1102,369 @@ input:focus-visible {
   cursor: pointer;
 }
 
+/* Phase 2 planning tools */
+.planner-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.planner-toolbar button {
+  display: flex;
+  height: 31px;
+  padding: 0 9px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #6d8293;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.planner-toolbar button:hover,
+.planner-toolbar button.active {
+  border-color: rgba(57, 215, 231, 0.22);
+  color: #c8edf0;
+  background: #142634;
+}
+
+.planner-toolbar button.active svg {
+  color: var(--cyan);
+}
+
+.heading-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.transform-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.transform-grid label {
+  display: grid;
+  min-width: 0;
+  color: #738898;
+  font-size: 8px;
+  grid-template-columns: 1fr auto;
+}
+
+.transform-grid label span {
+  color: #496072;
+}
+
+.transform-grid input {
+  width: 100%;
+  height: 33px;
+  margin-top: 5px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  outline: 0;
+  background: #0a121c;
+  color: #d1dfe3;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  grid-column: span 2;
+}
+
+.transform-grid input:focus {
+  border-color: rgba(57, 215, 231, 0.48);
+}
+
+.range-field {
+  display: grid;
+  margin-top: 18px;
+  align-items: center;
+  color: #738898;
+  font-size: 9px;
+  grid-template-columns: 1fr auto;
+}
+
+.range-field strong {
+  color: #a6bac5;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.range-field input {
+  width: 100%;
+  margin-top: 9px;
+  accent-color: var(--cyan);
+  grid-column: span 2;
+}
+
+.fit-check {
+  margin-top: 22px;
+  padding-top: 2px;
+  border-top: 1px solid var(--line);
+}
+
+.panel-copy,
+.limitation {
+  margin: 0 0 13px;
+  color: #647b8c;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.primary-action,
+.secondary-action {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  margin-top: 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(57, 215, 231, 0.3);
+  border-radius: 3px;
+  background: #11303c;
+  color: #c9f1f3;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.secondary-action {
+  margin-top: 8px;
+  border-color: var(--line);
+  background: transparent;
+  color: #8398a8;
+}
+
+.secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.fit-result {
+  display: flex;
+  margin-top: 10px;
+  padding: 10px;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid var(--line);
+  background: #0b141e;
+}
+
+.fit-result svg {
+  flex: 0 0 auto;
+}
+
+.fit-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fit-result strong {
+  color: #b6c5cd;
+  font-size: 9px;
+}
+
+.fit-result span {
+  color: #617787;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.fit-result--clear {
+  border-color: rgba(83, 205, 151, 0.24);
+  background: rgba(39, 111, 79, 0.12);
+}
+
+.fit-result--clear svg {
+  color: #59c995;
+}
+
+.fit-result--issue {
+  border-color: rgba(239, 107, 107, 0.25);
+  background: rgba(126, 38, 44, 0.13);
+}
+
+.fit-result--issue svg {
+  color: #ee7474;
+}
+
+.fit-result--unchecked svg {
+  color: #71899a;
+}
+
+.placement-state {
+  display: flex;
+  margin-top: 20px;
+  padding: 10px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(83, 205, 151, 0.24);
+  color: #79ba9a;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.placement-state.issue {
+  border-color: rgba(239, 107, 107, 0.27);
+  color: #dc8181;
+}
+
+.door-summary {
+  display: flex;
+  margin-top: 23px;
+  padding: 11px;
+  border: 1px solid rgba(239, 180, 95, 0.2);
+  background: rgba(113, 76, 29, 0.12);
+  flex-direction: column;
+  gap: 4px;
+}
+
+.door-summary strong {
+  color: #c2a475;
+  font-size: 9px;
+}
+
+.door-summary span {
+  color: #746d62;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.sun-settings__grid {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.sun-settings__grid label {
+  display: flex;
+  color: #738898;
+  font-size: 8px;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sun-settings__grid label.wide {
+  grid-column: span 2;
+}
+
+.sun-settings__grid label span {
+  float: right;
+  color: #9aafba;
+}
+
+.sun-settings__grid input {
+  width: 100%;
+  height: 34px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  outline: 0;
+  background: #0a121c;
+  color: #d3e0e5;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.sun-settings__grid input[type="range"] {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: #ffc77e;
+}
+
+.sun-error {
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid rgba(239, 107, 107, 0.28);
+  color: #dc8181;
+  font-size: 8px;
+}
+
+.solar-facts {
+  display: grid;
+  margin: 15px 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  gap: 8px;
+}
+
+.solar-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.solar-facts span {
+  color: #647b8c;
+  font-size: 8px;
+}
+
+.solar-facts strong {
+  color: #c6d7dd;
+  font-family: ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.sun-live {
+  bottom: 22px;
+  left: 22px;
+  display: flex;
+  padding: 12px 14px;
+  align-items: center;
+  gap: 10px;
+}
+
+.sun-live svg {
+  color: #ffc77e;
+}
+
+.sun-live div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sun-live span {
+  color: #768b9b;
+  font-size: 8px;
+}
+
+.sun-live strong {
+  color: #dce9eb;
+  font-size: 9px;
+}
+
+.metrics--phase2 {
+  width: 224px;
+}
+
+.add-furniture--with-metrics {
+  left: 260px;
+}
+
+.measure-label {
+  display: block;
+  padding: 4px 7px;
+  border: 1px solid rgba(248, 212, 119, 0.4);
+  border-radius: 2px;
+  background: rgba(9, 17, 26, 0.9);
+  color: #f8d477;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
 @media (max-width: 1100px) {
   .module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1116,7 +1479,7 @@ input:focus-visible {
   }
 
   .workspace-grid {
-    grid-template-columns: 165px minmax(360px, 1fr) 280px;
+    grid-template-columns: 165px minmax(360px, 1fr) 320px;
   }
 
   .dimension-summary {

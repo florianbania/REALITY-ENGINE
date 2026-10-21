@@ -1,5 +1,5 @@
 export const PROJECT_SCHEMA = 'reality-engine/project'
-export const PROJECT_SCHEMA_VERSION = 1 as const
+export const PROJECT_SCHEMA_VERSION = 2 as const
 
 export type MeasurementSource = 'manual' | 'import' | 'scan'
 export type FurnitureKind = 'sofa' | 'table' | 'chair' | 'cabinet' | 'bed'
@@ -24,13 +24,20 @@ export interface Position3D {
   zM: number
 }
 
+export interface Orientation3D {
+  rotationYDeg: number
+  tiltXDeg: number
+  tiltZDeg: number
+}
+
 export interface FurnitureObject {
   id: string
   name: string
   kind: FurnitureKind
   dimensions: Dimensions
   position: Position3D
-  rotationYDeg: number
+  orientation: Orientation3D
+  minimumClearanceM: number
   color: string
 }
 
@@ -38,6 +45,27 @@ export interface Room {
   id: string
   name: string
   dimensions: Dimensions
+}
+
+export type WallSide = 'north' | 'east' | 'south' | 'west'
+
+export interface Door {
+  id: string
+  name: string
+  wall: WallSide
+  offsetM: number
+  width: Measurement
+  height: Measurement
+  swingDepthM: number
+}
+
+export interface SunSettings {
+  latitude: number
+  longitude: number
+  timeZone: string
+  /** Clockwise offset between room north (-Z) and geographic north. */
+  northOffsetDeg: number
+  localDateTime: string
 }
 
 export interface DigitalTwinProject {
@@ -48,7 +76,9 @@ export interface DigitalTwinProject {
   createdAt: string
   updatedAt: string
   room: Room
+  doors: Door[]
   furniture: FurnitureObject[]
+  sun: SunSettings
 }
 
 export type DimensionKey = keyof Dimensions
