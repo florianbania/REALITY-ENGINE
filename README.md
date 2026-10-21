@@ -1,8 +1,8 @@
 # REALITY ENGINE
 
-Phase 3 einer modularen Web-App für einen gemeinsamen, messbaren digitalen
-Zwilling von Räumen und Einrichtung. Die Oberfläche ist deutschsprachig und
-umfasst **FIT**, **SUN**, **SPACE** und **SMART SCAN** (Demo-Import).
+Phase 4 einer modularen Web-App für einen gemeinsamen, messbaren digitalen
+Zwilling. **FIT**, **SUN**, **SPACE** und **SMART SCAN** (Dateiimport). Es gibt
+**keinen** getesteten nativen iPhone-Scan.
 
 ## Start
 
@@ -22,33 +22,30 @@ npm test
 npm run build
 ```
 
-## Phase-3-Funktionsumfang
+## Phase-4-Schritt
 
-- Projektschema `reality-engine/project@3` mit Migration von `@1` und `@2`
-- einheitliche Scan-Datenschnittstelle `reality-engine/scan@1`
-- JSON-Import von Scan-Dokumenten und gekennzeichnete Demo-Simulation
-- geometrische Validierung vor der Übernahme (Raumhülle, Möbelmaße, OBB)
-- Messquellen `manual` / `import` / `scan` und manuelle Messwertkorrektur
-- FIT, SUN und SPACE aus Phase 2 bleiben erhalten
+- dateibasierter Import von `reality-engine/scan@1` **und** RoomPlan-ähnlichem JSON
+- Validierung, Messquelle `scan`, dokumentierte Unsicherheit 0,05 m bei RoomPlan-Dateien
+- manuelle Messwertkorrektur (Quelle wird `manual`)
+- Demo-Simulation aus Phase 3 bleibt als gekennzeichnetes Fixture
+- natives Skelett unter `native/RoomPlanBridge/` — ausdrücklich unimplementiert und ungetestet
 
 ## Architektur
 
 ```text
 src/
 ├── core/        # Datenmodell, Einheiten, Mutationen, Import/Export
-├── simulation/  # deterministische Kollision, Sonne und Flächen
-├── scan/        # Scan-Dokumente, Demo-Adapter, Geometrieprüfung
-└── web/         # React, Zustand, React Three Fiber und Oberfläche
+├── simulation/  # Kollision, Sonne, Flächen
+├── scan/        # Scan-Dokumente, RoomPlan-Dateiimport, Demo-Adapter
+└── web/         # React-Oberfläche
+native/RoomPlanBridge/   # unimplementierte iOS-Schnittstelle
 ```
-
-Scan-Adapter liefern ausschließlich prüfbare Messwertentwürfe. Der Demo-Adapter
-liest ein Fixture und gibt das ausdrücklich als Simulation aus.
 
 ## Bekannte Einschränkungen
 
-- Es gibt keinen echten iPhone-, LiDAR- oder Kamerascan.
-- Die Demo-Unsicherheiten sind plausible Annahmen, keine kalibrierte Sensorik.
-- Unzugeordnete Möbelentwürfe werden nicht stillschweigend als neue Objekte
-  angelegt.
-- FIT ohne Wegsuche; Türzonen als Rechtecke; SUN ohne Wetter/Gelände;
-  SPACE-Fläche als 5-cm-Raster; Speicherung nur lokal.
+- Kein Live-LiDAR, keine Kamera, kein getesteter RoomPlan-Capture.
+- RoomPlan-Transform/Pose wird nicht in den Zwilling geschrieben.
+- Unsicherheit im RoomPlan-Import ist eine Annahme, keine Sensorstreuung.
+- Unbekannte Objektkategorien werden übersprungen, nicht erfunden.
+- FIT ohne Wegsuche; Türzonen Rechtecke; SUN ohne Wetter; SPACE 5-cm-Raster;
+  Speicherung nur lokal.

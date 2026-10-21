@@ -10,6 +10,13 @@ import type {
 export const SCAN_SCHEMA = 'reality-engine/scan'
 export const SCAN_SCHEMA_VERSION = 1 as const
 
+export class ScanFormatError extends Error {
+  constructor(public readonly issues: string[]) {
+    super(`Scan-Datei ist ungültig: ${issues.join(' · ')}`)
+    this.name = 'ScanFormatError'
+  }
+}
+
 export type ScanCapability = 'room-envelope' | 'furniture-bounds'
 
 export type { LastScanRecord, ScanOrigin }

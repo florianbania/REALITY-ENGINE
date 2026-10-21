@@ -12,19 +12,27 @@ import { createMeasurement, updateFurnitureMeasurement, updateRoomMeasurement } 
 import {
   SCAN_SCHEMA,
   SCAN_SCHEMA_VERSION,
+  ScanFormatError,
   type ScanApplyResult,
   type ScanCapability,
   type ScanDocument,
   type ScanMeasurementDraft,
   type ScanTarget,
 } from './contracts'
+import { convertRoomPlanLike, isRoomPlanLike } from './roomplan'
 import { validateScanGeometry } from './geometry'
 
-export class ScanFormatError extends Error {
-  constructor(public readonly issues: string[]) {
-    super(`Scan-Datei ist ungültig: ${issues.join(' · ')}`)
-    this.name = 'ScanFormatError'
+export { ScanFormatError }
+
+export function parseIncomingScan(source: string): ScanDocument {
+  let value: unknown
+  try {
+    value = JSON.parse(source)
+  } catch {
+    throw new ScanFormatError(['Die Datei enthält kein gültiges JSON.'])
   }
+  if (isRoomPlanLike(value)) return convertRoomPlanLike(value)
+  return validateScanDocument(value)
 }
 
 export function parseScanDocument(source: string): ScanDocument {

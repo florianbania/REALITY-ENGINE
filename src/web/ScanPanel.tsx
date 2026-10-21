@@ -6,7 +6,7 @@ import { SOURCE_LABELS } from '../core/model'
 import { formatLength } from '../core/units'
 import type { ScanApplyResult, ScanDocument } from '../scan/contracts'
 import { DemoSimulatedScanAdapter } from '../scan/demo-adapter'
-import { parseScanDocument, ScanFormatError } from '../scan/document'
+import { parseIncomingScan, ScanFormatError } from '../scan/document'
 
 interface ScanPanelProps {
   project: DigitalTwinProject
@@ -34,7 +34,7 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
     try {
       setError(null)
       setResult(null)
-      setPending(parseScanDocument(await file.text()))
+      setPending(parseIncomingScan(await file.text()))
     } catch (caught) {
       setPending(null)
       setError(
@@ -72,14 +72,14 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
       <div className="scan-banner">
         <ScanLine size={16} />
         <div>
-          <strong>SMART SCAN · Demo-Import</strong>
-          <span>Kein Kamerazugriff, kein iPhone-LiDAR, keine vorgetäuschte Messung.</span>
+          <strong>SMART SCAN · Dateiimport</strong>
+          <span>Kein Kamerazugriff, kein getesteter iPhone-LiDAR, keine vorgetäuschte Messung.</span>
         </div>
       </div>
       <p className="panel-copy">
-        Die einheitliche Schnittstelle nimmt nur JSON-Dokumente mit Schema
-        reality-engine/scan@1 entgegen. Entwürfe werden geometrisch geprüft und
-        erst danach auf den Zwilling geschrieben.
+        Unterstützt reality-engine/scan@1 und RoomPlan-ähnliches JSON. Entwürfe
+        werden geometrisch geprüft. Die native RoomPlan-Erfassung ist nur als
+        unimplementiertes Skelett dokumentiert.
       </p>
       <input
         ref={fileInput}
@@ -92,7 +92,7 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
         Demo-Simulation laden
       </button>
       <button className="secondary-action" type="button" onClick={() => fileInput.current?.click()}>
-        <FileJson size={15} /> Scan-JSON importieren
+        <FileJson size={15} /> Scan- oder RoomPlan-JSON importieren
       </button>
       {error && <div className="sun-error">{error}</div>}
       {pending && (
