@@ -8,7 +8,12 @@ import {
   type MeasurementSource,
   type ScanOrigin,
 } from '../core/model'
-import { createMeasurement, updateFurnitureMeasurement, updateRoomMeasurement } from '../core/project'
+import {
+  createMeasurement,
+  updateFurnitureMeasurement,
+  updateFurniturePose,
+  updateRoomMeasurement,
+} from '../core/project'
 import {
   SCAN_SCHEMA,
   SCAN_SCHEMA_VERSION,
@@ -17,6 +22,8 @@ import {
   type ScanCapability,
   type ScanDocument,
   type ScanMeasurementDraft,
+  type ScanOpeningDraft,
+  type ScanPoseDraft,
   type ScanTarget,
 } from './contracts'
 import { convertRoomPlanLike, isRoomPlanLike } from './roomplan'
@@ -89,6 +96,14 @@ export function validateScanDocument(value: unknown): ScanDocument {
     },
     notes,
     drafts,
+    poses: Array.isArray(root.poses)
+      ? root.poses.map((item, index) => parsePose(item, `$.poses[${index}]`, issues))
+      : [],
+    openingDrafts: Array.isArray(root.openingDrafts)
+      ? root.openingDrafts.map((item, index) =>
+          parseOpeningDraft(item, `$.openingDrafts[${index}]`, issues),
+        )
+      : [],
   }
   if (issues.length > 0) throw new ScanFormatError(issues)
   return document
@@ -102,7 +117,7 @@ export function applyScanDocument(
   const issues = validateScanGeometry(project, document)
   const blocking = issues.filter((issue) => issue.severity === 'error')
   if (blocking.length > 0) {
-    return { project, applied: 0, unmatched: document.drafts, issues }
+    return { project, applied: 0, posesApplied: 0, unmatched: document.drafts, issues }
   }
   let next = project
   const unmatched: ScanMeasurementDraft[] = []
@@ -145,6 +160,28 @@ export function applyScanDocument(
           )
     applied += 1
   }
+  let posesApplied = 0
+  for (const pose of document.poses) {
+    const resolved = resolveTarget(next, pose.target)
+    if (!resolved || resolved.type === 'room') continue
+    next = updateFurniturePose(next, resolved.id, pose.position, pose.orientation, now)
+    posesApplied += 1
+  }
+  if (document.openingDrafts.length > 0) {
+    next = {
+      ...next,
+      openings: document.openingDrafts.map((draft, index) => ({
+        id: `scan-opening-${index}`,
+        name: draft.name,
+        kind: draft.kind,
+        wall: draft.wall,
+        offsetM: draft.offsetM,
+        width: createMeasurement(draft.widthM, 'scan', 0.05, now),
+        height: createMeasurement(draft.heightM, 'scan', 0.05, now),
+        sillHeightM: draft.sillHeightM,
+      })),
+    }
+  }
   const lastScan: LastScanRecord = {
     origin: document.origin,
     demo: document.demo,
@@ -156,6 +193,7 @@ export function applyScanDocument(
   return {
     project: { ...next, updatedAt: now, lastScan },
     applied,
+    posesApplied,
     unmatched,
     issues,
   }
@@ -229,6 +267,43 @@ function parseDraft(value: unknown, path: string, issues: string[]): ScanMeasure
     target: parseTarget(item.target, `${path}.target`, issues),
     dimension: parseDimension(item.dimension, `${path}.dimension`, issues),
     measurement: parseMeasurement(item.measurement, `${path}.measurement`, issues),
+  }
+}
+
+function parsePose(value: unknown, path: string, issues: string[]): ScanPoseDraft {
+  const item = record(value, path, issues)
+  const position = record(item.position, `${path}.position`, issues)
+  const orientation = record(item.orientation, `${path}.orientation`, issues)
+  return {
+    target: parseTarget(item.target, `${path}.target`, issues),
+    position: {
+      xM: finite(position.xM, `${path}.position.xM`, issues),
+      yM: finite(position.yM, `${path}.position.yM`, issues),
+      zM: finite(position.zM, `${path}.position.zM`, issues),
+    },
+    orientation: {
+      rotationYDeg: finite(orientation.rotationYDeg, `${path}.orientation.rotationYDeg`, issues),
+      tiltXDeg: finite(orientation.tiltXDeg, `${path}.orientation.tiltXDeg`, issues),
+      tiltZDeg: finite(orientation.tiltZDeg, `${path}.orientation.tiltZDeg`, issues),
+    },
+    derivedFrom: 'file-transform',
+  }
+}
+
+function parseOpeningDraft(value: unknown, path: string, issues: string[]): ScanOpeningDraft {
+  const item = record(value, path, issues)
+  const walls = ['north', 'east', 'south', 'west'] as const
+  const wall = walls.includes(item.wall as (typeof walls)[number])
+    ? (item.wall as (typeof walls)[number])
+    : (issues.push(`${path}.wall ist unbekannt.`), 'south')
+  return {
+    name: text(item.name, `${path}.name`, issues),
+    kind: item.kind === 'opening' ? 'opening' : 'window',
+    wall,
+    offsetM: finite(item.offsetM, `${path}.offsetM`, issues),
+    widthM: finite(item.widthM, `${path}.widthM`, issues),
+    heightM: finite(item.heightM, `${path}.heightM`, issues),
+    sillHeightM: finite(item.sillHeightM, `${path}.sillHeightM`, issues),
   }
 }
 

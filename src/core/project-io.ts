@@ -12,6 +12,8 @@ import {
   type Position3D,
   type Room,
   type LastScanRecord,
+  type Opening,
+  type OpeningKind,
   type ScanOrigin,
   type SunSettings,
   type WallSide,
@@ -54,6 +56,9 @@ export function validateProject(value: unknown): DigitalTwinProject {
   const doors = Array.isArray(root.doors)
     ? root.doors.map((item, index) => parseDoor(item, `$.doors[${index}]`, issues))
     : (issues.push('$.doors muss eine Liste sein.'), [])
+  const openings = Array.isArray(root.openings)
+    ? root.openings.map((item, index) => parseOpening(item, `$.openings[${index}]`, issues))
+    : (issues.push('$.openings muss eine Liste sein.'), [])
   const furniture = Array.isArray(root.furniture)
     ? root.furniture.map((item, index) => parseFurniture(item, `$.furniture[${index}]`, issues))
     : (issues.push('$.furniture muss eine Liste sein.'), [])
@@ -67,6 +72,7 @@ export function validateProject(value: unknown): DigitalTwinProject {
     updatedAt: isoDate(root.updatedAt, '$.updatedAt', issues),
     room,
     doors,
+    openings,
     furniture,
     sun: parseSunSettings(root.sun, '$.sun', issues),
     lastScan: parseLastScan(root.lastScan, '$.lastScan', issues),
@@ -123,8 +129,15 @@ export function migrateProjectValue(value: unknown): unknown {
   if (root.schemaVersion === 2) {
     root = {
       ...root,
-      schemaVersion: PROJECT_SCHEMA_VERSION,
+      schemaVersion: 3,
       lastScan: root.lastScan ?? null,
+    }
+  }
+  if (root.schemaVersion === 3) {
+    root = {
+      ...root,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      openings: Array.isArray(root.openings) ? root.openings : [],
     }
   }
   return root
@@ -158,6 +171,30 @@ function parseFurniture(value: unknown, path: string, issues: string[]): Furnitu
       issues,
     ),
     color: text(item.color, `${path}.color`, issues),
+  }
+}
+
+function parseOpening(value: unknown, path: string, issues: string[]): Opening {
+  const item = record(value, path, issues)
+  const walls: WallSide[] = ['north', 'east', 'south', 'west']
+  const kinds: OpeningKind[] = ['window', 'opening']
+  const wall = walls.includes(item.wall as WallSide)
+    ? (item.wall as WallSide)
+    : (issues.push(`${path}.wall ist unbekannt.`), 'south')
+  const kind = kinds.includes(item.kind as OpeningKind)
+    ? (item.kind as OpeningKind)
+    : (issues.push(`${path}.kind ist unbekannt.`), 'window')
+  const sillHeightM = finiteNumber(item.sillHeightM, `${path}.sillHeightM`, issues)
+  if (sillHeightM < 0) issues.push(`${path}.sillHeightM darf nicht negativ sein.`)
+  return {
+    id: text(item.id, `${path}.id`, issues),
+    name: text(item.name, `${path}.name`, issues),
+    kind,
+    wall,
+    offsetM: finiteNumber(item.offsetM, `${path}.offsetM`, issues),
+    width: parseMeasurement(item.width, `${path}.width`, issues),
+    height: parseMeasurement(item.height, `${path}.height`, issues),
+    sillHeightM,
   }
 }
 

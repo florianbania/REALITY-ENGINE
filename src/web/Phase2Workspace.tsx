@@ -39,7 +39,7 @@ import {
   type TransformDraft,
 } from '../simulation/collision'
 import { calculateSpaceMetrics } from '../simulation/space-metrics'
-import { addLocalMinutes, calculateSun, type SunResult } from '../simulation/sun'
+import { addLocalMinutes, calculateSunForProject, type SunResult } from '../simulation/sun'
 import { MeasurementField } from './MeasurementField'
 import {
   PlannerScene,
@@ -64,6 +64,17 @@ const furnitureOptions: { kind: FurnitureKind; label: string }[] = [
   { kind: 'bed', label: 'Bett' },
 ]
 
+const FIT_STATUS_COPY: Record<PathCheckResult['status'], [string, string]> = {
+  clear: ['Pfad geprüft: frei', 'Kein Hindernis in den geprüften Stützstellen.'],
+  collision: ['Kollision erkannt', 'Eine OBB überschneidet ein anderes Möbelobjekt.'],
+  clearance: [
+    'Mindestabstand unterschritten',
+    'Keine Berührung, aber der hinterlegte Sicherheitsabstand ist zu klein.',
+  ],
+  'outside-room': ['Außerhalb des Raums', 'Mindestens eine Ecke verlässt die Raumhülle.'],
+  'door-blocked': ['Türfreizone blockiert', 'Der konservative Türbereich wird geschnitten.'],
+}
+
 function resultCopy(result: PathCheckResult | null) {
   if (!result) {
     return {
@@ -72,19 +83,14 @@ function resultCopy(result: PathCheckResult | null) {
       tone: 'unchecked',
     }
   }
-  const copy = {
-    clear: ['Pfad geprüft: frei', 'Kein Hindernis in den geprüften Stützstellen.'],
-    collision: ['Kollision erkannt', 'Eine OBB überschneidet ein anderes Möbelobjekt.'],
-    clearance: [
-      'Mindestabstand unterschritten',
-      'Keine Berührung, aber der hinterlegte Sicherheitsabstand ist zu klein.',
-    ],
-    'outside-room': ['Außerhalb des Raums', 'Mindestens eine Ecke verlässt die Raumhülle.'],
-    'door-blocked': ['Türfreizone blockiert', 'Der konservative Türbereich wird geschnitten.'],
-  }[result.status]
+  const copy = FIT_STATUS_COPY[result.status]
+  const startNote =
+    result.startStatus === 'clear'
+      ? ''
+      : ` Startzustand: ${FIT_STATUS_COPY[result.startStatus][0]}.`
   return {
     title: copy[0],
-    detail: `${copy[1]} ${result.checkedSamples} Stützstellen, max. ${Math.round(result.sampleStepM * 100)} cm Schrittweite.`,
+    detail: `${copy[1]}${startNote} ${result.checkedSamples} Stützstellen, max. ${Math.round(result.sampleStepM * 100)} cm, Interpolation ${result.interpolation}. Keine Wegsuche.`,
     tone: result.status === 'clear' ? 'clear' : 'issue',
   }
 }
@@ -124,8 +130,8 @@ function FitTransportPanel({
     <div className="fit-check" data-project={projectId}>
       <h3>Manueller Transportpfad</h3>
       <p className="panel-copy">
-        Geradlinige Interpolation vom aktuellen Zustand zum Ziel – einschließlich Drehung und
-        Kippung. Es findet keine Wegsuche statt.
+        Linearer kürzester Yaw-Pfad vom aktuellen Zustand zum Ziel – einschließlich Drehung und
+        Kippung. Es findet keine automatische 3D-Wegsuche statt.
       </p>
       <div className="transform-grid">
         {(['xM', 'yM', 'zM'] as const).map((axis) => (
@@ -160,7 +166,7 @@ function FitTransportPanel({
       <button
         className="primary-action"
         type="button"
-        onClick={() => setResult(checkTransportPath(project, item.id, target, 0.05))}
+        onClick={() => setResult(checkTransportPath(project, item.id, target, 0.02))}
       >
         <Ruler size={15} /> Gesamten Pfad prüfen
       </button>
@@ -269,12 +275,25 @@ function SunControls({
             label="Auf- / Untergang"
             value={`${result.sunriseLabel ?? '—'} / ${result.sunsetLabel ?? '—'}`}
           />
+          <Fact
+            label="Raum-Nord (−Z)"
+            value={`${settings.northOffsetDeg}° Versatz zu geogr. Nord`}
+          />
+          <Fact
+            label="Direkt beleuchtete Öffnungen"
+            value={
+              result.illuminatedOpeningIds.length === 0
+                ? 'keine (Sonne unter Horizont oder Wand abgewandt)'
+                : String(result.illuminatedOpeningIds.length)
+            }
+          />
         </div>
       )}
       <p className="limitation">
-        SunCalc liefert die astronomische Sonnenposition. Schatten sind geometrische
-        Three.js-Schatten des Modells; Wetter, Gelände, Nachbargebäude, Fensteroptik und
-        diffuse Himmelsstrahlung sind nicht berücksichtigt.
+        SunCalc liefert die astronomische Sonnenposition. Lichtwege sind nur die
+        modellierten Fenster/Öffnungen, wenn der Lichtvektor die Innen-Normale trifft.
+        Wetter, Bewölkung, Gelände, Nachbargebäude, Glasoptik und diffuse
+        Himmelsstrahlung werden nicht erfunden.
       </p>
     </div>
   )
@@ -309,7 +328,7 @@ export function Phase2Workspace() {
   let sunResult: SunResult | null = null
   let sunError: string | null = null
   try {
-    sunResult = calculateSun(project.sun)
+    sunResult = calculateSunForProject(project)
   } catch (error) {
     sunError = error instanceof Error ? error.message : 'Sonnenstand konnte nicht berechnet werden.'
   }
@@ -471,7 +490,10 @@ export function Phase2Workspace() {
                 <Fact label="Freie Bodenfläche" value={`≈ ${metrics.freeAreaM2.toFixed(1)} m²`} />
                 <Fact label="Kollisionen" value={String(metrics.collisionPairs.length)} />
                 <Fact label="Blockierte Türen" value={String(metrics.blockedDoorIds.length)} />
-                <small>Union projizierter OBB-Flächen, deterministisches {Math.round(metrics.gridCellM * 100)}-cm-Raster.</small>
+                <small>
+                  Union projizierter OBB-Flächen, am Raum geclippt, deterministisches{' '}
+                  {Math.round(metrics.gridCellM * 100)}-cm-Raster — kein CAD-Boolean.
+                </small>
               </div>
             )}
             {store.mode !== 'sun' && store.mode !== 'scan' && (
@@ -585,8 +607,12 @@ export function Phase2Workspace() {
                   />
                 ))}
                 <div className="door-summary">
-                  <strong>{project.doors.length} Türfreizone</strong>
-                  <span>Konservatives Rechteck statt behaupteter Schwenkgeometrie.</span>
+                  <strong>
+                    {project.doors.length} Türfreizone · {project.openings.length} Öffnungen
+                  </strong>
+                  <span>
+                    Türen: konservatives Rechteck. Fenster sind Lichtwege, keine Wetterannahme.
+                  </span>
                 </div>
               </>
             )}

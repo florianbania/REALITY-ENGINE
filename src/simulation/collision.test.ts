@@ -14,7 +14,10 @@ describe('FIT-Kollisionskern', () => {
     expect(
       intersectsObb(furnitureToObb(project.furniture[0]), furnitureToObb(project.furniture[1])),
     ).toBe(false)
-    expect(placementStatus(project, project.furniture[0].id).status).toBe('clear')
+    const placement = placementStatus(project, project.furniture[0].id)
+    expect(placement.status).toBe('clear')
+    expect(placement.startStatus).toBe('clear')
+    expect(placement.interpolation).toBe('linear-shortest-yaw')
   })
 
   it('meldet Kollision, wenn ein Objekt in ein anderes geschoben wird', () => {
@@ -68,6 +71,24 @@ describe('FIT-Kollisionskern', () => {
     })
     expect(outside.status).toBe('outside-room')
     expect(isObbInsideRoom(furnitureToObb(sofa), project)).toBe(true)
+  })
+
+  it('interpoliert den kürzesten Yaw und prüft den Startzustand ehrlich', () => {
+    const seed = createSeedProject()
+    const sofa = { ...seed.furniture[0], orientation: { rotationYDeg: 350, tiltXDeg: 0, tiltZDeg: 0 } }
+    const project = { ...seed, furniture: [sofa, seed.furniture[1]] }
+    const result = checkTransportPath(
+      project,
+      sofa.id,
+      {
+        position: sofa.position,
+        orientation: { rotationYDeg: 10, tiltXDeg: 0, tiltZDeg: 0 },
+      },
+      0.02,
+    )
+    expect(result.status).toBe('clear')
+    expect(result.startStatus).toBe('clear')
+    expect(result.checkedSamples).toBeGreaterThan(10)
   })
 
   it('weist ungültige Schrittweiten zurück', () => {

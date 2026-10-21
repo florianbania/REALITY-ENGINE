@@ -9,7 +9,7 @@ describe('Projekt Import und Export', () => {
     const imported = importProject(serialized)
 
     expect(imported).toEqual(project)
-    expect(serialized).toContain('"schemaVersion": 3')
+    expect(serialized).toContain('"schemaVersion": 4')
   })
 
   it('migriert Phase-1-Projekte ohne erfundene Messwerte', () => {
@@ -27,9 +27,11 @@ describe('Projekt Import und Export', () => {
     } as Record<string, unknown>
     delete v1.doors
     delete v1.sun
+    delete v1.openings
     const imported = importProject(JSON.stringify(v1))
-    expect(imported.schemaVersion).toBe(3)
+    expect(imported.schemaVersion).toBe(4)
     expect(imported.lastScan).toBeNull()
+    expect(imported.openings).toEqual([])
     expect(imported.doors).toEqual([])
     expect(imported.sun.timeZone).toBe('UTC')
     expect(imported.sun.latitude).toBe(0)
@@ -51,7 +53,7 @@ describe('Projekt Import und Export', () => {
   })
 
   it('weist unbekannte künftige Schemaversionen zurück', () => {
-    const future = { ...createSeedProject(), schemaVersion: 4 }
+    const future = { ...createSeedProject(), schemaVersion: 5 }
     expect(() => importProject(JSON.stringify(future))).toThrow(/nicht unterstützt/)
   })
 

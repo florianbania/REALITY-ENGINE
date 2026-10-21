@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { addLocalMinutes, calculateSun, localDateTimeToInstant } from './sun'
+import { createSeedProject } from '../core/project'
+import {
+  addLocalMinutes,
+  calculateSun,
+  calculateSunForProject,
+  localDateTimeToInstant,
+  openingReceivesDirectSun,
+} from './sun'
 
 describe('SUN-Astronomie', () => {
   const berlinSummer = {
@@ -14,13 +21,33 @@ describe('SUN-Astronomie', () => {
     const result = calculateSun(berlinSummer)
     expect(result.isAboveHorizon).toBe(true)
     expect(result.altitudeDeg).toBeGreaterThan(40)
-    expect(result.azimuthNorthDeg).toBeGreaterThanOrEqual(0)
-    expect(result.azimuthNorthDeg).toBeLessThan(360)
+    expect(result.altitudeDeg).toBeLessThan(70)
+    expect(result.azimuthNorthDeg).toBeGreaterThan(180)
+    expect(result.azimuthNorthDeg).toBeLessThan(280)
     expect(result.localLabel).toContain('14:00')
     expect(result.zoneLabel).toMatch(/CEST|GMT\+2|\+02/)
     expect(result.sceneDirection.y).toBeGreaterThan(0)
     expect(result.sunriseLabel).toMatch(/^\d{2}:\d{2}$/)
     expect(result.sunsetLabel).toMatch(/^\d{2}:\d{2}$/)
+    expect(result.roomNorthAxis).toEqual({ x: 0, y: 0, z: -1 })
+  })
+
+  it('markiert Westfenster am Nachmittag geometrisch, ohne Wetter zu erfinden', () => {
+    const project = createSeedProject()
+    const result = calculateSunForProject(project)
+    expect(result.isAboveHorizon).toBe(true)
+    expect(openingReceivesDirectSun('west', result)).toBe(true)
+    expect(openingReceivesDirectSun('east', result)).toBe(false)
+    expect(result.illuminatedOpeningIds).toEqual([project.openings[0].id])
+  })
+
+  it('beleuchtet keine Öffnung unter dem Horizont', () => {
+    const night = calculateSun({
+      ...berlinSummer,
+      localDateTime: '2026-06-21T00:30',
+    })
+    expect(night.isAboveHorizon).toBe(false)
+    expect(openingReceivesDirectSun('west', night)).toBe(false)
   })
 
   it('weist fehlende lokale Zeiten in der DST-Lücke zurück', () => {

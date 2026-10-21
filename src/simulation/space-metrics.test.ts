@@ -6,7 +6,7 @@ describe('SPACE-Geometriekern', () => {
   it('integriert die Union projizierter OBB-Flächen auf einem expliziten Raster', () => {
     const metrics = calculateSpaceMetrics(createSeedProject())
 
-    expect(metrics.gridCellM).toBe(0.05)
+    expect(metrics.gridCellM).toBe(0.01)
     expect(metrics.floorAreaM2).toBeCloseTo(21.32)
     expect(metrics.furnitureFootprintM2).toBeGreaterThan(2)
     expect(metrics.furnitureFootprintM2).toBeLessThan(3.2)

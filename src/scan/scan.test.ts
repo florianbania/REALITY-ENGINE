@@ -24,6 +24,7 @@ describe('Scan-Datenschnittstelle', () => {
 
     const result = applyScanDocument(project, document, '2026-03-12T10:00:00.000Z')
     expect(result.applied).toBe(9)
+    expect(result.posesApplied).toBe(0)
     expect(result.unmatched).toEqual([])
     expect(result.issues.filter((issue) => issue.severity === 'error')).toEqual([])
     expect(result.project.room.dimensions.width).toEqual({

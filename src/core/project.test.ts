@@ -6,9 +6,11 @@ describe('versionierter digitaler Zwilling', () => {
     const project = createSeedProject()
 
     expect(project.schema).toBe('reality-engine/project')
-    expect(project.schemaVersion).toBe(3)
+    expect(project.schemaVersion).toBe(4)
     expect(project.lastScan).toBeNull()
     expect(project.doors).toHaveLength(1)
+    expect(project.openings).toHaveLength(1)
+    expect(project.openings[0].wall).toBe('west')
     expect(project.sun.timeZone).toBe('Europe/Berlin')
     expect(project.room.dimensions.width.valueM).toBe(5.2)
     expect(project.room.dimensions.width.source).toBe('manual')

@@ -71,5 +71,7 @@ export function createDemoScanDocument(): ScanDocument {
         measurement: scanMeasure(0.46, 0.015),
       },
     ],
+    poses: [],
+    openingDrafts: [],
   }
 }

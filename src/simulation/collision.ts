@@ -2,6 +2,7 @@ import type {
   DigitalTwinProject,
   Door,
   FurnitureObject,
+  Opening,
   Orientation3D,
   Position3D,
 } from '../core/model'
@@ -41,6 +42,8 @@ export interface PathCheckResult {
   sampleStepM: number
   firstIssueAtM?: number
   colliderId?: string
+  startStatus: FitStatus
+  interpolation: 'linear-shortest-yaw'
 }
 
 const EPSILON = 1e-8
@@ -135,11 +138,37 @@ export function isObbInsideRoom(obb: Obb, project: DigitalTwinProject): boolean 
   )
 }
 
+export function evaluatePose(
+  project: DigitalTwinProject,
+  moving: FurnitureObject,
+  transform: TransformDraft,
+): { status: FitStatus; colliderId?: string } {
+  const movingObb = furnitureToObb(moving, transform)
+  if (!isObbInsideRoom(movingObb, project)) return { status: 'outside-room' }
+  for (const door of project.doors) {
+    if (furnitureIntersectsDoor(project, moving, transform, door)) {
+      return { status: 'door-blocked', colliderId: door.id }
+    }
+  }
+  for (const other of project.furniture) {
+    if (other.id === moving.id) continue
+    const otherObb = furnitureToObb(other)
+    if (intersectsObb(movingObb, otherObb)) {
+      return { status: 'collision', colliderId: other.id }
+    }
+    const requiredClearance = Math.max(moving.minimumClearanceM, other.minimumClearanceM)
+    if (requiredClearance > 0 && intersectsObb(movingObb, otherObb, requiredClearance)) {
+      return { status: 'clearance', colliderId: other.id }
+    }
+  }
+  return { status: 'clear' }
+}
+
 export function checkTransportPath(
   project: DigitalTwinProject,
   furnitureId: string,
   target: TransformDraft,
-  sampleStepM = 0.05,
+  sampleStepM = 0.02,
 ): PathCheckResult {
   if (!Number.isFinite(sampleStepM) || sampleStepM <= 0) {
     throw new RangeError('Die Prüfschrittweite muss größer als 0 m sein.')
@@ -147,47 +176,43 @@ export function checkTransportPath(
   const moving = project.furniture.find((item) => item.id === furnitureId)
   if (!moving) throw new Error(`Möbelobjekt "${furnitureId}" wurde nicht gefunden.`)
   const start = { position: moving.position, orientation: moving.orientation }
+  const startStatus = evaluatePose(project, moving, start).status
   const distance = distance3(start.position, target.position)
-  const angleSpan = Math.max(
-    Math.abs(target.orientation.rotationYDeg - start.orientation.rotationYDeg),
+  const yawSpan = Math.abs(shortestDegDelta(start.orientation.rotationYDeg, target.orientation.rotationYDeg))
+  const tiltSpan = Math.max(
     Math.abs(target.orientation.tiltXDeg - start.orientation.tiltXDeg),
     Math.abs(target.orientation.tiltZDeg - start.orientation.tiltZDeg),
   )
-  const segments = Math.max(1, Math.ceil(distance / sampleStepM), Math.ceil(angleSpan / 3))
-  const others = project.furniture.filter((item) => item.id !== furnitureId)
+  const segments = Math.max(
+    1,
+    Math.ceil(distance / sampleStepM),
+    Math.ceil(yawSpan / 2),
+    Math.ceil(tiltSpan / 2),
+  )
 
   for (let index = 0; index <= segments; index += 1) {
     const progress = index / segments
     const transform = interpolateTransform(start, target, progress)
-    const movingObb = furnitureToObb(moving, transform)
-    const common = {
-      checkedSamples: index + 1,
-      sampleStepM,
-      firstIssueAtM: distance * progress,
-    }
-    if (!isObbInsideRoom(movingObb, project)) {
-      return { status: 'outside-room', ...common }
-    }
-    for (const door of project.doors) {
-      if (intersectsObb(movingObb, doorClearanceObb(project, door))) {
-        return { status: 'door-blocked', colliderId: door.id, ...common }
-      }
-    }
-    for (const other of others) {
-      const otherObb = furnitureToObb(other)
-      if (intersectsObb(movingObb, otherObb)) {
-        return { status: 'collision', colliderId: other.id, ...common }
-      }
-      const requiredClearance = Math.max(
-        moving.minimumClearanceM,
-        other.minimumClearanceM,
-      )
-      if (requiredClearance > 0 && intersectsObb(movingObb, otherObb, requiredClearance)) {
-        return { status: 'clearance', colliderId: other.id, ...common }
+    const sample = evaluatePose(project, moving, transform)
+    if (sample.status !== 'clear') {
+      return {
+        status: sample.status,
+        colliderId: sample.colliderId,
+        checkedSamples: index + 1,
+        sampleStepM,
+        firstIssueAtM: distance * progress,
+        startStatus,
+        interpolation: 'linear-shortest-yaw',
       }
     }
   }
-  return { status: 'clear', checkedSamples: segments + 1, sampleStepM }
+  return {
+    status: 'clear',
+    checkedSamples: segments + 1,
+    sampleStepM,
+    startStatus,
+    interpolation: 'linear-shortest-yaw',
+  }
 }
 
 /** Conservative rectangular door swing/clearance zone inside the room. */
@@ -237,8 +262,87 @@ export function placementStatus(
     project,
     furnitureId,
     { position: item.position, orientation: item.orientation },
-    0.05,
+    0.02,
   )
+}
+
+export function furnitureIntersectsDoor(
+  project: DigitalTwinProject,
+  item: FurnitureObject,
+  transform: TransformDraft,
+  door: Door,
+): boolean {
+  const zone = doorClearanceObb(project, door)
+  const movingObb = furnitureToObb(item, transform)
+  if (intersectsObb(movingObb, zone)) return true
+  return convexPolygonsOverlap(footprintFromObb(movingObb), doorFootprint(project, door))
+}
+
+export function openingApertureObb(project: DigitalTwinProject, opening: Opening): Obb {
+  const roomWidth = project.room.dimensions.width.valueM
+  const roomDepth = project.room.dimensions.depth.valueM
+  const width = opening.width.valueM
+  const height = opening.height.valueM
+  const thickness = 0.05
+  const horizontal = opening.wall === 'north' || opening.wall === 'south'
+  const center: Vec3 = {
+    x: 0,
+    y: opening.sillHeightM + height / 2,
+    z: 0,
+  }
+  if (opening.wall === 'south') {
+    center.x = opening.offsetM
+    center.z = roomDepth / 2 - thickness / 2
+  } else if (opening.wall === 'north') {
+    center.x = opening.offsetM
+    center.z = -roomDepth / 2 + thickness / 2
+  } else if (opening.wall === 'east') {
+    center.x = roomWidth / 2 - thickness / 2
+    center.z = opening.offsetM
+  } else {
+    center.x = -roomWidth / 2 + thickness / 2
+    center.z = opening.offsetM
+  }
+  return {
+    center,
+    halfSize: {
+      x: (horizontal ? width : thickness) / 2,
+      y: height / 2,
+      z: (horizontal ? thickness : width) / 2,
+    },
+    axes: [
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: 0, z: 1 },
+    ],
+  }
+}
+
+export function doorFootprint(project: DigitalTwinProject, door: Door): Point2[] {
+  const zone = doorClearanceObb(project, door)
+  const hx = zone.halfSize.x
+  const hz = zone.halfSize.z
+  return [
+    { x: zone.center.x - hx, z: zone.center.z - hz },
+    { x: zone.center.x + hx, z: zone.center.z - hz },
+    { x: zone.center.x + hx, z: zone.center.z + hz },
+    { x: zone.center.x - hx, z: zone.center.z + hz },
+  ]
+}
+
+export function footprintFromObb(obb: Obb): Point2[] {
+  return convexHull(obbCorners(obb).map(({ x, z }) => ({ x, z })))
+}
+
+export function clipPolygonToRoom(polygon: Point2[], project: DigitalTwinProject): Point2[] {
+  const halfW = project.room.dimensions.width.valueM / 2
+  const halfD = project.room.dimensions.depth.valueM / 2
+  return clipAabb(polygon, -halfW, halfW, -halfD, halfD)
+}
+
+export function convexPolygonsOverlap(a: Point2[], b: Point2[]): boolean {
+  if (a.length < 3 || b.length < 3) return false
+  return !separatedByEdges(a, b) && !separatedByEdges(b, a)
 }
 
 export function obbCorners(obb: Obb): Vec3[] {
@@ -312,14 +416,18 @@ function interpolateTransform(
       zM: mix(start.position.zM, target.position.zM),
     },
     orientation: {
-      rotationYDeg: mix(
-        start.orientation.rotationYDeg,
-        target.orientation.rotationYDeg,
-      ),
+      rotationYDeg:
+        start.orientation.rotationYDeg +
+        shortestDegDelta(start.orientation.rotationYDeg, target.orientation.rotationYDeg) * progress,
       tiltXDeg: mix(start.orientation.tiltXDeg, target.orientation.tiltXDeg),
       tiltZDeg: mix(start.orientation.tiltZDeg, target.orientation.tiltZDeg),
     },
   }
+}
+
+function shortestDegDelta(from: number, to: number): number {
+  const wrapped = ((((to - from) % 360) + 540) % 360) - 180
+  return wrapped
 }
 
 function distance3(a: Position3D, b: Position3D): number {
@@ -344,6 +452,65 @@ function scale(value: Vec3, factor: number): Vec3 {
 
 function dot(a: Vec3, b: Vec3): number {
   return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+function separatedByEdges(source: Point2[], other: Point2[]): boolean {
+  for (let index = 0; index < source.length; index += 1) {
+    const a = source[index]
+    const b = source[(index + 1) % source.length]
+    const nx = b.z - a.z
+    const nz = -(b.x - a.x)
+    const sourceProj = source.map((point) => point.x * nx + point.z * nz)
+    const otherProj = other.map((point) => point.x * nx + point.z * nz)
+    if (Math.max(...sourceProj) < Math.min(...otherProj) - EPSILON) return true
+    if (Math.max(...otherProj) < Math.min(...sourceProj) - EPSILON) return true
+  }
+  return false
+}
+
+function clipAabb(
+  polygon: Point2[],
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+): Point2[] {
+  const clip = (
+    input: Point2[],
+    inside: (point: Point2) => boolean,
+    intersect: (from: Point2, to: Point2) => Point2,
+  ) => {
+    const output: Point2[] = []
+    for (let index = 0; index < input.length; index += 1) {
+      const current = input[index]
+      const previous = input[(index + input.length - 1) % input.length]
+      const currentIn = inside(current)
+      const previousIn = inside(previous)
+      if (currentIn) {
+        if (!previousIn) output.push(intersect(previous, current))
+        output.push(current)
+      } else if (previousIn) {
+        output.push(intersect(previous, current))
+      }
+    }
+    return output
+  }
+  let result = polygon
+  result = clip(result, (point) => point.x >= minX, (from, to) => lerpX(from, to, minX))
+  result = clip(result, (point) => point.x <= maxX, (from, to) => lerpX(from, to, maxX))
+  result = clip(result, (point) => point.z >= minZ, (from, to) => lerpZ(from, to, minZ))
+  result = clip(result, (point) => point.z <= maxZ, (from, to) => lerpZ(from, to, maxZ))
+  return result
+}
+
+function lerpX(from: Point2, to: Point2, x: number): Point2 {
+  const t = (x - from.x) / (to.x - from.x || 1)
+  return { x, z: from.z + (to.z - from.z) * t }
+}
+
+function lerpZ(from: Point2, to: Point2, z: number): Point2 {
+  const t = (z - from.z) / (to.z - from.z || 1)
+  return { x: from.x + (to.x - from.x) * t, z }
 }
 
 function convexHull(points: Point2[]): Point2[] {

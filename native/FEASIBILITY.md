@@ -35,5 +35,5 @@ zusammen. Sie sind keine Messergebnisse dieses Projekts.
 ## Was die Web-App tatsächlich kann
 
 Dateiimport (`reality-engine/scan@1` oder RoomPlan-ähnliches JSON), Demo-Fixture,
-Geometrieprüfung, manuelle Korrektur. Keine Kamerasession, kein LiDAR, keine
-Photogrammetrie.
+Geometrieprüfung, manuelle Korrektur, Pose nur soweit die Datei-Transform lesbar
+ist. Keine Kamerasession, kein LiDAR, keine Photogrammetrie.

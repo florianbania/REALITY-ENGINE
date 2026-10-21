@@ -98,7 +98,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="01"
           title="FIT"
           description="Passt es wirklich?"
-          detail="Maße & Möbel"
+          detail="Linearer Pfad, keine Wegsuche"
           icon={<Ruler size={28} />}
           onClick={() => onEnter('fit')}
         />
@@ -106,7 +106,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="02"
           title="SUN"
           description="Licht im Raum erleben."
-          detail="SunCalc & Schatten"
+          detail="Nord & Fenster, kein Wetter"
           icon={<Sun size={28} />}
           onClick={() => onEnter('sun')}
         />
@@ -114,7 +114,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="03"
           title="SPACE"
           description="Fläche bewusst nutzen."
-          detail="Grundriss & 3D-Planer"
+          detail="1-cm-Raster & Kollisionen"
           icon={<Boxes size={28} />}
           onClick={() => onEnter('space')}
         />

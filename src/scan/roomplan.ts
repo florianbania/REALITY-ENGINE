@@ -1,10 +1,12 @@
-import type { FurnitureKind } from '../core/model'
+import type { FurnitureKind, WallSide } from '../core/model'
 import {
   SCAN_SCHEMA,
   SCAN_SCHEMA_VERSION,
   ScanFormatError,
   type ScanDocument,
   type ScanMeasurementDraft,
+  type ScanOpeningDraft,
+  type ScanPoseDraft,
 } from './contracts'
 
 /** Documented assumption: RoomPlan JSON has no per-edge uncertainty. */
@@ -61,8 +63,10 @@ export function convertRoomPlanLike(
       draft('height', envelope.height, importedAt),
     )
   }
+  const origin = roomOrigin(floors)
   const kindIndex: Partial<Record<FurnitureKind, number>> = {}
   const skipped: string[] = []
+  const poses: ScanPoseDraft[] = []
   objects.forEach((item, index) => {
     const category = readCategory(item.category)
     const kind = category ? CATEGORY_TO_KIND[category] : undefined
@@ -91,6 +95,16 @@ export function convertRoomPlanLike(
         measurement: measure(dimensions.depth, importedAt),
       },
     )
+    const pose = poseFromObject(item, dimensions.height, origin)
+    if (pose) poses.push({ target, ...pose, derivedFrom: 'file-transform' })
+  })
+  const openingDrafts: ScanOpeningDraft[] = asObjects(root.windows).flatMap((item, index) => {
+    const converted = openingFromSurface(item, envelope)
+    if (!converted) {
+      skipped.push(`windows[${index}]`)
+      return []
+    }
+    return [converted]
   })
   if (!envelope) {
     issues.push('Raumhülle fehlt: weder floors[].dimensions noch ableitbare Wände.')
@@ -100,7 +114,7 @@ export function convertRoomPlanLike(
   const notes = [
     'Dateiimport eines RoomPlan-ähnlichen JSON. Kein Live-Scan, kein LiDAR-Zugriff in dieser App.',
     `Messunsicherheit ${ROOMPLAN_DEFAULT_UNCERTAINTY_M} m ist eine dokumentierte Annahme, weil die Datei keine Unsicherheit enthält.`,
-    'RoomPlan-Transform/Pose wird nicht übernommen: ohne kalibrierte Ursprungszuordnung wäre das fingierte Genauigkeit.',
+    'Pose/Transform wird relativ zum Floor-Ursprung bzw. Wand-AABB-Zentrum übernommen, sofern die 4×4-Matrix lesbar ist. Keine zusätzliche Kalibrierung.',
     'Die native RoomPlan-/SwiftUI-Erfassung ist in native/RoomPlanBridge nur als unimplementiertes Skelett hinterlegt und nicht getestet.',
   ]
   if (skipped.length > 0) {
@@ -126,6 +140,8 @@ export function convertRoomPlanLike(
     },
     notes,
     drafts,
+    poses,
+    openingDrafts,
   }
 }
 
@@ -220,6 +236,75 @@ function readDimensions(
     const depth = numberAt(item.depth ?? item.z)
     if (width === null || height === null || depth === null) return null
     return { width: Math.abs(width), height: Math.abs(height), depth: Math.abs(depth) }
+  }
+  return null
+}
+
+function poseFromObject(
+  item: Record<string, unknown>,
+  heightM: number,
+  origin: { x: number; y: number; z: number },
+): { position: { xM: number; yM: number; zM: number }; orientation: { rotationYDeg: number; tiltXDeg: number; tiltZDeg: number } } | null {
+  const translation = readTranslation(item.transform)
+  const yaw = readYawY(item.transform)
+  if (!translation || yaw === null) return null
+  return {
+    position: {
+      xM: translation.x - origin.x,
+      yM: Math.max(0, translation.y - origin.y - heightM / 2),
+      zM: translation.z - origin.z,
+    },
+    orientation: { rotationYDeg: yaw, tiltXDeg: 0, tiltZDeg: 0 },
+  }
+}
+
+function openingFromSurface(
+  item: Record<string, unknown>,
+  envelope: { width: number; depth: number; height: number } | null,
+): ScanOpeningDraft | null {
+  const dimensions = readDimensions(item.dimensions)
+  const translation = readTranslation(item.transform)
+  if (!dimensions || !translation || !envelope) return null
+  const wall = wallSideFromPoint(translation.x, translation.z, envelope.width, envelope.depth)
+  const offsetM = wall === 'north' || wall === 'south' ? translation.x : translation.z
+  const sillHeightM = Math.max(0, translation.y - dimensions.height / 2)
+  return {
+    name: typeof item.identifier === 'string' ? item.identifier : 'Fenster',
+    kind: 'window',
+    wall,
+    offsetM,
+    widthM: dimensions.width,
+    heightM: dimensions.height,
+    sillHeightM,
+  }
+}
+
+function wallSideFromPoint(x: number, z: number, width: number, depth: number): WallSide {
+  const toEast = width / 2 - x
+  const toWest = x + width / 2
+  const toSouth = depth / 2 - z
+  const toNorth = z + depth / 2
+  const nearest = Math.min(toEast, toWest, toSouth, toNorth)
+  if (nearest === toSouth) return 'south'
+  if (nearest === toNorth) return 'north'
+  if (nearest === toEast) return 'east'
+  return 'west'
+}
+
+function roomOrigin(floors: Record<string, unknown>[]): { x: number; y: number; z: number } {
+  return floors.map((item) => readTranslation(item.transform)).find(Boolean) ?? { x: 0, y: 0, z: 0 }
+}
+
+function readYawY(value: unknown): number | null {
+  if (Array.isArray(value) && value.length === 16 && value.every((item) => typeof item === 'number')) {
+    return (Math.atan2(value[2], value[0]) * 180) / Math.PI
+  }
+  if (Array.isArray(value) && value.length === 4 && Array.isArray(value[0])) {
+    const xAxis = value[0] as unknown[]
+    const x = numberAt(xAxis[0])
+    const z = numberAt(xAxis[2])
+    if (x === null || z === null) return null
+    return (Math.atan2(z, x) * 180) / Math.PI
   }
   return null
 }

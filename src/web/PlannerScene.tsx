@@ -18,7 +18,7 @@ import type {
   Position3D,
 } from '../core/model'
 import type { Point2 } from '../simulation/collision'
-import { doorClearanceObb } from '../simulation/collision'
+import { doorClearanceObb, openingApertureObb } from '../simulation/collision'
 import type { SunResult } from '../simulation/sun'
 import type { WorkspaceMode } from './store'
 
@@ -298,6 +298,45 @@ function Scene(props: PlannerSceneProps) {
           </mesh>
         )
       })}
+
+      {project.openings.map((opening) => {
+        const aperture = openingApertureObb(project, opening)
+        const lit = sun?.illuminatedOpeningIds.includes(opening.id) ?? false
+        return (
+          <mesh
+            key={opening.id}
+            position={[aperture.center.x, aperture.center.y, aperture.center.z]}
+          >
+            <boxGeometry
+              args={[aperture.halfSize.x * 2, aperture.halfSize.y * 2, aperture.halfSize.z * 2]}
+            />
+            <meshStandardMaterial
+              color={lit ? '#f4d27a' : '#7ec8e8'}
+              emissive={lit ? '#f0c14a' : '#1a3a4a'}
+              emissiveIntensity={lit ? 0.85 : 0.12}
+              transparent
+              opacity={0.55}
+              roughness={0.2}
+            />
+          </mesh>
+        )
+      })}
+
+      {mode === 'sun' && sun && (
+        <group>
+          <Line
+            points={[
+              [0, 0.04, 0],
+              [sun.roomNorthAxis.x * 1.4, 0.04, sun.roomNorthAxis.z * 1.4],
+            ]}
+            color="#6ee7ff"
+            lineWidth={2}
+          />
+          <Html position={[sun.roomNorthAxis.x * 1.55, 0.12, sun.roomNorthAxis.z * 1.55]} center>
+            <span className="measure-label">N</span>
+          </Html>
+        </group>
+      )}
 
       {project.furniture
         .filter((item) => item.id !== selectedId)

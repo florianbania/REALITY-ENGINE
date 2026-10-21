@@ -1,6 +1,6 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { getPosition, getTimes } from 'suncalc'
-import type { SunSettings } from '../core/model'
+import type { DigitalTwinProject, SunSettings, WallSide } from '../core/model'
 
 export interface SunResult {
   instant: Date
@@ -12,18 +12,22 @@ export interface SunResult {
   zoneLabel: string
   sunriseLabel: string | null
   sunsetLabel: string | null
+  roomNorthAxis: { x: number; y: number; z: number }
+  illuminatedOpeningIds: string[]
 }
 
 export function calculateSun(settings: SunSettings): SunResult {
   assertSettings(settings)
   const instant = localDateTimeToInstant(settings.localDateTime, settings.timeZone)
   const position = getPosition(instant, settings.latitude, settings.longitude)
-  const altitudeDeg = radiansToDegrees(position.altitude)
-  const azimuthNorthDeg = normalizeDegrees(radiansToDegrees(position.azimuth) + 180)
+  // suncalc 2.x: altitude in degrees, azimuth clockwise from geographic north.
+  const altitudeDeg = position.altitude
+  const azimuthNorthDeg = normalizeDegrees(position.azimuth)
   const roomAzimuth = degreesToRadians(
     normalizeDegrees(azimuthNorthDeg - settings.northOffsetDeg),
   )
-  const horizontal = Math.cos(position.altitude)
+  const altitudeRad = degreesToRadians(altitudeDeg)
+  const horizontal = Math.cos(altitudeRad)
   const times = getTimes(instant, settings.latitude, settings.longitude)
   return {
     instant,
@@ -31,15 +35,43 @@ export function calculateSun(settings: SunSettings): SunResult {
     azimuthNorthDeg,
     sceneDirection: {
       x: Math.sin(roomAzimuth) * horizontal,
-      y: Math.sin(position.altitude),
+      y: Math.sin(altitudeRad),
       z: -Math.cos(roomAzimuth) * horizontal,
     },
-    isAboveHorizon: position.altitude > 0,
+    isAboveHorizon: altitudeDeg > 0,
     localLabel: formatInTimeZone(instant, settings.timeZone, 'dd.MM.yyyy, HH:mm'),
     zoneLabel: formatInTimeZone(instant, settings.timeZone, 'zzz (XXX)'),
     sunriseLabel: validTimeLabel(times.sunrise, settings.timeZone),
     sunsetLabel: validTimeLabel(times.sunset, settings.timeZone),
+    roomNorthAxis: { x: 0, y: 0, z: -1 },
+    illuminatedOpeningIds: [],
   }
+}
+
+export function calculateSunForProject(project: DigitalTwinProject): SunResult {
+  const result = calculateSun(project.sun)
+  const illuminatedOpeningIds = project.openings
+    .filter((opening) => openingReceivesDirectSun(opening.wall, result))
+    .map((opening) => opening.id)
+  return { ...result, illuminatedOpeningIds }
+}
+
+export function openingReceivesDirectSun(wall: WallSide, sun: SunResult): boolean {
+  if (!sun.isAboveHorizon) return false
+  const inward = inwardNormal(wall)
+  const light = {
+    x: -sun.sceneDirection.x,
+    y: -sun.sceneDirection.y,
+    z: -sun.sceneDirection.z,
+  }
+  return light.x * inward.x + light.y * inward.y + light.z * inward.z > 1e-6
+}
+
+function inwardNormal(wall: WallSide): { x: number; y: number; z: number } {
+  if (wall === 'south') return { x: 0, y: 0, z: -1 }
+  if (wall === 'north') return { x: 0, y: 0, z: 1 }
+  if (wall === 'east') return { x: -1, y: 0, z: 0 }
+  return { x: 1, y: 0, z: 0 }
 }
 
 export function localDateTimeToInstant(localDateTime: string, timeZone: string): Date {
@@ -81,10 +113,6 @@ function assertSettings(settings: SunSettings): void {
 function validTimeLabel(date: Date | null | undefined, timeZone: string): string | null {
   if (!date || Number.isNaN(date.getTime())) return null
   return formatInTimeZone(date, timeZone, 'HH:mm')
-}
-
-function radiansToDegrees(value: number): number {
-  return (value * 180) / Math.PI
 }
 
 function degreesToRadians(value: number): number {

@@ -21,6 +21,13 @@
       "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.305, -2.04, 1]
     }
   ],
+  "windows": [
+    {
+      "identifier": "west-window",
+      "dimensions": [1.42, 1.28, 0.08],
+      "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2.58, 1.54, 0, 1]
+    }
+  ],
   "doors": [
     {
       "identifier": "door-0",

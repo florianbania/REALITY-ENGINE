@@ -53,7 +53,7 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
     if (!pending) return
     const next = onApply(pending)
     setResult(next)
-    if (next.applied > 0) setPending(null)
+    if (next.applied > 0 || next.posesApplied > 0) setPending(null)
   }
 
   const sources = [
@@ -111,7 +111,10 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
         <div className="scan-pending">
           {pending.demo && <span className="badge badge--muted">{pending.demoLabel ?? 'DEMO'}</span>}
           <strong>{pending.adapter.name}</strong>
-          <span>{pending.drafts.length} Messentwürfe · {pending.origin}</span>
+          <span>
+            {pending.drafts.length} Messentwürfe · {pending.poses.length} Posen ·{' '}
+            {pending.openingDrafts.length} Öffnungen · {pending.origin}
+          </span>
           <ul>
             {pending.notes.map((note) => (
               <li key={note}>{note}</li>
@@ -123,17 +126,17 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
         </div>
       )}
       {result && (
-        <div className={`fit-result ${result.applied > 0 ? 'fit-result--clear' : 'fit-result--issue'}`}>
-          {result.applied > 0 ? <ScanLine size={18} /> : <CircleAlert size={18} />}
+        <div className={`fit-result ${result.applied > 0 || result.posesApplied > 0 ? 'fit-result--clear' : 'fit-result--issue'}`}>
+          {result.applied > 0 || result.posesApplied > 0 ? <ScanLine size={18} /> : <CircleAlert size={18} />}
           <div>
             <strong>
-              {result.applied > 0
-                ? `${result.applied} Maße übernommen`
+              {result.applied > 0 || result.posesApplied > 0
+                ? `${result.applied} Maße, ${result.posesApplied} Posen übernommen`
                 : 'Keine Maße übernommen'}
             </strong>
             <span>
               {result.unmatched.length} unzugeordnet · {result.issues.length} Hinweise.
-              Quellen der übernommenen Werte: Scan.
+              Quellen der übernommenen Werte: Scan. Pose nur aus Datei-Transform.
             </span>
           </div>
         </div>

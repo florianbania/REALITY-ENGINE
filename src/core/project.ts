@@ -50,6 +50,18 @@ export function createStarterProject(now = new Date().toISOString()): DigitalTwi
         swingDepthM: 0.9,
       },
     ],
+    openings: [
+      {
+        id: crypto.randomUUID(),
+        name: 'Westfenster',
+        kind: 'window',
+        wall: 'west',
+        offsetM: 0,
+        width: measured(1.4),
+        height: measured(1.3),
+        sillHeightM: 0.9,
+      },
+    ],
     furniture: [
       createFurniture('sofa', 'Sofa', { xM: 0.2, yM: 0, zM: -0.9 }, now),
       createFurniture('table', 'Couchtisch', { xM: 0.8, yM: 0, zM: 0.55 }, now),
@@ -137,6 +149,23 @@ export function updateFurnitureMeasurement(
       ...item,
       dimensions: { ...item.dimensions, [dimension]: measurement },
     }
+  })
+  if (!found) throw new Error(`Möbelobjekt "${furnitureId}" wurde nicht gefunden.`)
+  return { ...project, updatedAt: now, furniture }
+}
+
+export function updateFurniturePose(
+  project: DigitalTwinProject,
+  furnitureId: string,
+  position: { xM: number; yM: number; zM: number },
+  orientation: { rotationYDeg: number; tiltXDeg: number; tiltZDeg: number },
+  now = new Date().toISOString(),
+): DigitalTwinProject {
+  let found = false
+  const furniture = project.furniture.map((item) => {
+    if (item.id !== furnitureId) return item
+    found = true
+    return { ...item, position, orientation }
   })
   if (!found) throw new Error(`Möbelobjekt "${furnitureId}" wurde nicht gefunden.`)
   return { ...project, updatedAt: now, furniture }

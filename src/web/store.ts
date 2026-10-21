@@ -286,7 +286,7 @@ export const useProjectStore = create<ProjectState>()(
           state.projects.find((project) => project.id === state.activeProjectId) ??
           state.projects[0]
         const result = applyScanDocument(current, document, now)
-        if (result.applied > 0) {
+        if (result.project !== current) {
           set({
             projects: state.projects.map((project) =>
               project.id === current.id ? result.project : project,
@@ -298,7 +298,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'reality-engine-projects-v1',
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<ProjectState>
         const migratedProjects = (persisted.projects ?? [])

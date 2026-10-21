@@ -40,6 +40,23 @@ export interface ScanMeasurementDraft {
   measurement: Measurement
 }
 
+export interface ScanPoseDraft {
+  target: ScanTarget
+  position: { xM: number; yM: number; zM: number }
+  orientation: { rotationYDeg: number; tiltXDeg: number; tiltZDeg: number }
+  derivedFrom: 'file-transform'
+}
+
+export interface ScanOpeningDraft {
+  name: string
+  kind: 'window' | 'opening'
+  wall: 'north' | 'east' | 'south' | 'west'
+  offsetM: number
+  widthM: number
+  heightM: number
+  sillHeightM: number
+}
+
 export interface ScanGeometryIssue {
   path: string
   message: string
@@ -61,11 +78,14 @@ export interface ScanDocument {
   adapter: ScanAdapterInfo
   notes: string[]
   drafts: ScanMeasurementDraft[]
+  poses: ScanPoseDraft[]
+  openingDrafts: ScanOpeningDraft[]
 }
 
 export interface ScanApplyResult {
   project: DigitalTwinProject
   applied: number
+  posesApplied: number
   unmatched: ScanMeasurementDraft[]
   issues: ScanGeometryIssue[]
 }

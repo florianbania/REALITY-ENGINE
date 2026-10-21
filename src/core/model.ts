@@ -1,5 +1,5 @@
 export const PROJECT_SCHEMA = 'reality-engine/project'
-export const PROJECT_SCHEMA_VERSION = 3 as const
+export const PROJECT_SCHEMA_VERSION = 4 as const
 
 export type MeasurementSource = 'manual' | 'import' | 'scan'
 export type FurnitureKind = 'sofa' | 'table' | 'chair' | 'cabinet' | 'bed'
@@ -59,6 +59,19 @@ export interface Door {
   swingDepthM: number
 }
 
+export type OpeningKind = 'window' | 'opening'
+
+export interface Opening {
+  id: string
+  name: string
+  kind: OpeningKind
+  wall: WallSide
+  offsetM: number
+  width: Measurement
+  height: Measurement
+  sillHeightM: number
+}
+
 export interface SunSettings {
   latitude: number
   longitude: number
@@ -88,6 +101,7 @@ export interface DigitalTwinProject {
   updatedAt: string
   room: Room
   doors: Door[]
+  openings: Opening[]
   furniture: FurnitureObject[]
   sun: SunSettings
   lastScan: LastScanRecord | null

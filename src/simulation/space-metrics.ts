@@ -1,6 +1,7 @@
 import type { DigitalTwinProject } from '../core/model'
 import {
-  doorClearanceObb,
+  clipPolygonToRoom,
+  furnitureIntersectsDoor,
   furnitureToObb,
   intersectsObb,
   pointInPolygon,
@@ -18,12 +19,12 @@ export interface SpaceMetrics {
 }
 
 /**
- * Deterministic grid integration of the union of projected OBB footprints.
- * The returned cell size makes the numerical resolution explicit.
+ * Union of OBB footprints clipped to the room, rasterized on an explicit grid.
+ * Default 1 cm states the remaining discretization; this is not a Boolean CAD kernel.
  */
 export function calculateSpaceMetrics(
   project: DigitalTwinProject,
-  gridCellM = 0.05,
+  gridCellM = 0.01,
 ): SpaceMetrics {
   if (!Number.isFinite(gridCellM) || gridCellM <= 0) {
     throw new RangeError('Die Rasterweite muss größer als 0 m sein.')
@@ -36,13 +37,15 @@ export function calculateSpaceMetrics(
   const rows = Math.ceil(roomDepth / gridCellM)
   const cellWidth = roomWidth / columns
   const cellDepth = roomDepth / rows
-  const footprints = project.furniture.map(projectedFootprint)
+  const footprints = project.furniture.map((item) =>
+    clipPolygonToRoom(projectedFootprint(item), project),
+  )
   let occupiedCells = 0
   for (let column = 0; column < columns; column += 1) {
     const x = -roomWidth / 2 + (column + 0.5) * cellWidth
     for (let row = 0; row < rows; row += 1) {
       const z = -roomDepth / 2 + (row + 0.5) * cellDepth
-      if (footprints.some((polygon) => pointInPolygon({ x, z }, polygon))) {
+      if (footprints.some((polygon) => polygon.length >= 3 && pointInPolygon({ x, z }, polygon))) {
         occupiedCells += 1
       }
     }
@@ -68,10 +71,11 @@ export function calculateSpaceMetrics(
     }
   }
   const blockedDoorIds = project.doors
-    .filter((door) => {
-      const zone = doorClearanceObb(project, door)
-      return project.furniture.some((item) => intersectsObb(furnitureToObb(item), zone))
-    })
+    .filter((door) =>
+      project.furniture.some((item) =>
+        furnitureIntersectsDoor(project, item, item, door),
+      ),
+    )
     .map((door) => door.id)
   return {
     floorAreaM2,
