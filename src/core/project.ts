@@ -61,6 +61,7 @@ export function createStarterProject(now = new Date().toISOString()): DigitalTwi
       northOffsetDeg: 0,
       localDateTime: '2026-06-21T14:00',
     },
+    lastScan: null,
   }
 }
 

@@ -1465,6 +1465,94 @@ input:focus-visible {
   white-space: nowrap;
 }
 
+.scan-banner {
+  display: flex;
+  margin-bottom: 14px;
+  padding: 10px;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid rgba(239, 180, 95, 0.28);
+  background: rgba(113, 76, 29, 0.16);
+}
+
+.scan-banner svg {
+  flex: 0 0 auto;
+  color: #efb45f;
+}
+
+.scan-banner strong,
+.scan-pending strong {
+  display: block;
+  color: #e4d2b0;
+  font-size: 10px;
+}
+
+.scan-banner span,
+.scan-pending span {
+  color: #8a7b66;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.scan-pending {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+}
+
+.scan-pending ul {
+  margin: 10px 0 0;
+  padding-left: 16px;
+  color: #6d818f;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.scan-issue {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(239, 107, 107, 0.2);
+  color: #9aa8b3;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.scan-issue span {
+  display: block;
+  margin-bottom: 3px;
+  color: #dc8181;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.source-list {
+  display: grid;
+  gap: 6px;
+}
+
+.source-list > div {
+  display: grid;
+  align-items: baseline;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  color: #6d818f;
+  font-size: 8px;
+}
+
+.source-list strong {
+  color: #c5d4da;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+}
+
+.source-list em {
+  color: #5195a1;
+  font-style: normal;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 1100px) {
   .module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

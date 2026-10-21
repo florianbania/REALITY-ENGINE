@@ -46,12 +46,14 @@ import {
   type TransformMode,
   type ViewMode,
 } from './PlannerScene'
+import { ScanPanel } from './ScanPanel'
 import { getActiveProject, useProjectStore, type WorkspaceMode } from './store'
 
 const modes: { id: WorkspaceMode; label: string; icon: typeof Ruler }[] = [
   { id: 'fit', label: 'FIT', icon: Ruler },
   { id: 'sun', label: 'SUN', icon: Sun },
   { id: 'space', label: 'SPACE', icon: Layers3 },
+  { id: 'scan', label: 'SCAN', icon: ScanLine },
 ]
 
 const furnitureOptions: { kind: FurnitureKind; label: string }[] = [
@@ -380,11 +382,9 @@ export function Phase2Workspace() {
               onClick={() => setMode(id)}
             >
               <Icon size={16} /> {label}
+              {id === 'scan' && <sup>demo</sup>}
             </button>
           ))}
-          <button type="button" className="disabled" disabled>
-            <ScanLine size={16} /> SCAN <sup>später</sup>
-          </button>
         </div>
         <span className="save-state"><i />Lokal gespeichert</span>
       </header>
@@ -432,7 +432,7 @@ export function Phase2Workspace() {
                   <button type="button" className={viewMode === '3d' ? 'active' : ''} onClick={() => setViewMode('3d')}><View size={15} /> 3D</button>
                 </>
               )}
-              {store.mode !== 'sun' && (
+              {store.mode !== 'sun' && store.mode !== 'scan' && (
                 <>
                   <button type="button" className={transformMode === 'translate' && !measurementActive ? 'active' : ''} onClick={() => { setTransformMode('translate'); setMeasurementActive(false) }}><Move3d size={15} /> Bewegen</button>
                   <button type="button" className={transformMode === 'rotate' && !measurementActive ? 'active' : ''} onClick={() => { setTransformMode('rotate'); setMeasurementActive(false) }}><Rotate3d size={15} /> Drehen</button>
@@ -454,7 +454,7 @@ export function Phase2Workspace() {
               selectedId={store.selectedFurnitureId}
               mode={store.mode}
               viewMode={viewMode}
-              transformMode={store.mode === 'sun' ? 'none' : transformMode}
+              transformMode={store.mode === 'sun' || store.mode === 'scan' ? 'none' : transformMode}
               collisionIds={issueIds}
               sun={sunResult}
               measurementActive={measurementActive}
@@ -474,7 +474,7 @@ export function Phase2Workspace() {
                 <small>Union projizierter OBB-Flächen, deterministisches {Math.round(metrics.gridCellM * 100)}-cm-Raster.</small>
               </div>
             )}
-            {store.mode !== 'sun' && (
+            {store.mode !== 'sun' && store.mode !== 'scan' && (
               <div className={`add-furniture ${store.mode === 'space' ? 'add-furniture--with-metrics' : ''}`}>
                 <button type="button" onClick={() => setShowAddMenu((value) => !value)} aria-expanded={showAddMenu}>
                   <Plus size={17} /> Platzieren <ChevronDown size={15} />
@@ -501,8 +501,16 @@ export function Phase2Workspace() {
 
         <aside className="inspector">
           <div className="panel-heading">
-            <span>{store.mode === 'sun' ? 'Sonnenmodell' : selected ? 'Möbelobjekt' : 'Raum'}</span>
-            {selected && store.mode !== 'sun' && (
+            <span>
+              {store.mode === 'sun'
+                ? 'Sonnenmodell'
+                : store.mode === 'scan'
+                  ? 'Scan-Import'
+                  : selected
+                    ? 'Möbelobjekt'
+                    : 'Raum'}
+            </span>
+            {selected && store.mode !== 'sun' && store.mode !== 'scan' && (
               <div className="heading-actions">
                 <button className="mini-button" type="button" onClick={() => store.duplicateFurniture(selected.id)} aria-label="Duplizieren"><Copy size={15} /></button>
                 <button className="mini-button danger" type="button" onClick={() => store.removeFurniture(selected.id)} aria-label="Löschen"><Trash2 size={15} /></button>
@@ -512,6 +520,8 @@ export function Phase2Workspace() {
           <div className="inspector-scroll">
             {store.mode === 'sun' ? (
               <SunControls settings={project.sun} result={sunResult} error={sunError} onChange={store.updateSunSettings} />
+            ) : store.mode === 'scan' ? (
+              <ScanPanel project={project} onApply={store.applyScan} />
             ) : selected ? (
               <>
                 <div className="object-type">

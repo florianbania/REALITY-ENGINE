@@ -16,8 +16,10 @@ import {
   updateFurnitureMeasurement,
   updateRoomMeasurement,
 } from '../core/project'
+import type { ScanApplyResult, ScanDocument } from '../scan/contracts'
+import { applyScanDocument } from '../scan/document'
 
-export type WorkspaceMode = 'fit' | 'sun' | 'space'
+export type WorkspaceMode = 'fit' | 'sun' | 'space' | 'scan'
 
 interface ProjectState {
   projects: DigitalTwinProject[]
@@ -61,6 +63,7 @@ interface ProjectState {
   ) => void
   updateFurnitureClearance: (id: string, minimumClearanceM: number) => void
   updateSunSettings: (settings: Partial<SunSettings>) => void
+  applyScan: (document: ScanDocument, now?: string) => ScanApplyResult
 }
 
 const initialProject = createStarterProject()
@@ -277,10 +280,25 @@ export const useProjectStore = create<ProjectState>()(
             sun: { ...project.sun, ...settings },
           })),
         ),
+      applyScan: (document, now = new Date().toISOString()) => {
+        const state = get()
+        const current =
+          state.projects.find((project) => project.id === state.activeProjectId) ??
+          state.projects[0]
+        const result = applyScanDocument(current, document, now)
+        if (result.applied > 0) {
+          set({
+            projects: state.projects.map((project) =>
+              project.id === current.id ? result.project : project,
+            ),
+          })
+        }
+        return result
+      },
     }),
     {
       name: 'reality-engine-projects-v1',
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const persisted = persistedState as Partial<ProjectState>
         const migratedProjects = (persisted.projects ?? [])

@@ -1,5 +1,5 @@
 export const PROJECT_SCHEMA = 'reality-engine/project'
-export const PROJECT_SCHEMA_VERSION = 2 as const
+export const PROJECT_SCHEMA_VERSION = 3 as const
 
 export type MeasurementSource = 'manual' | 'import' | 'scan'
 export type FurnitureKind = 'sofa' | 'table' | 'chair' | 'cabinet' | 'bed'
@@ -68,6 +68,17 @@ export interface SunSettings {
   localDateTime: string
 }
 
+export type ScanOrigin = 'demo-simulated' | 'file-import'
+
+export interface LastScanRecord {
+  origin: ScanOrigin
+  demo: boolean
+  adapterId: string
+  importedAt: string
+  draftCount: number
+  issueCount: number
+}
+
 export interface DigitalTwinProject {
   schema: typeof PROJECT_SCHEMA
   schemaVersion: typeof PROJECT_SCHEMA_VERSION
@@ -79,6 +90,7 @@ export interface DigitalTwinProject {
   doors: Door[]
   furniture: FurnitureObject[]
   sun: SunSettings
+  lastScan: LastScanRecord | null
 }
 
 export type DimensionKey = keyof Dimensions

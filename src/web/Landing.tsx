@@ -16,6 +16,7 @@ interface ModuleCardProps {
   icon: ReactNode
   onClick?: () => void
   disabled?: boolean
+  badge?: string
 }
 
 function ModuleCard({
@@ -26,6 +27,7 @@ function ModuleCard({
   icon,
   onClick,
   disabled,
+  badge,
 }: ModuleCardProps) {
   return (
     <button
@@ -36,7 +38,9 @@ function ModuleCard({
     >
       <span className="module-card__number">{code}</span>
       <span className="module-card__icon">{icon}</span>
-      {disabled && <span className="badge badge--muted">Später</span>}
+      {(disabled || badge) && (
+        <span className="badge badge--muted">{badge ?? 'Später'}</span>
+      )}
       <span className="module-card__content">
         <strong>{title}</strong>
         <span>{description}</span>
@@ -71,7 +75,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
       <section className="hero">
         <div className="eyebrow">
           <span />
-          Digitaler Zwilling · Phase 02
+          Digitaler Zwilling · Phase 03
         </div>
         <h1>
           Räume verstehen.
@@ -117,10 +121,11 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
         <ModuleCard
           code="04"
           title="SMART SCAN"
-          description="Raum automatisch erfassen."
-          detail="Noch nicht verfügbar"
+          description="Scan-JSON prüfen und übernehmen."
+          detail="Demo-Import · keine Kamera"
           icon={<ScanLine size={28} />}
-          disabled
+          badge="Demo"
+          onClick={() => onEnter('scan')}
         />
       </section>
 

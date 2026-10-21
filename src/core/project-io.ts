@@ -11,6 +11,8 @@ import {
   type Orientation3D,
   type Position3D,
   type Room,
+  type LastScanRecord,
+  type ScanOrigin,
   type SunSettings,
   type WallSide,
 } from './model'
@@ -67,6 +69,7 @@ export function validateProject(value: unknown): DigitalTwinProject {
     doors,
     furniture,
     sun: parseSunSettings(root.sun, '$.sun', issues),
+    lastScan: parseLastScan(root.lastScan, '$.lastScan', issues),
   } satisfies DigitalTwinProject
 
   if (issues.length > 0) throw new ProjectFormatError(issues)
@@ -79,40 +82,52 @@ export function validateProject(value: unknown): DigitalTwinProject {
  */
 export function migrateProjectValue(value: unknown): unknown {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return value
-  const root = value as Record<string, unknown>
-  if (root.schema !== PROJECT_SCHEMA || root.schemaVersion !== 1) return value
-  const furniture = Array.isArray(root.furniture)
-    ? root.furniture.map((entry) => {
-        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry
-        const item = entry as Record<string, unknown>
-        return {
-          ...item,
-          orientation: {
-            rotationYDeg:
-              typeof item.rotationYDeg === 'number' && Number.isFinite(item.rotationYDeg)
-                ? item.rotationYDeg
-                : 0,
-            tiltXDeg: 0,
-            tiltZDeg: 0,
-          },
-          minimumClearanceM: 0.05,
-          rotationYDeg: undefined,
-        }
-      })
-    : root.furniture
-  return {
-    ...root,
-    schemaVersion: PROJECT_SCHEMA_VERSION,
-    doors: [],
-    furniture,
-    sun: {
-      latitude: 0,
-      longitude: 0,
-      timeZone: 'UTC',
-      northOffsetDeg: 0,
-      localDateTime: '2026-06-21T12:00',
-    },
+  let root = value as Record<string, unknown>
+  if (root.schema !== PROJECT_SCHEMA) return value
+  if (root.schemaVersion === 1) {
+    const furniture = Array.isArray(root.furniture)
+      ? root.furniture.map((entry) => {
+          if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return entry
+          const item = entry as Record<string, unknown>
+          return {
+            ...item,
+            orientation: {
+              rotationYDeg:
+                typeof item.rotationYDeg === 'number' && Number.isFinite(item.rotationYDeg)
+                  ? item.rotationYDeg
+                  : 0,
+              tiltXDeg: 0,
+              tiltZDeg: 0,
+            },
+            minimumClearanceM: 0.05,
+            rotationYDeg: undefined,
+          }
+        })
+      : root.furniture
+    root = {
+      ...root,
+      schemaVersion: 2,
+      doors: Array.isArray(root.doors) ? root.doors : [],
+      furniture,
+      sun:
+        root.sun ??
+        {
+          latitude: 0,
+          longitude: 0,
+          timeZone: 'UTC',
+          northOffsetDeg: 0,
+          localDateTime: '2026-06-21T12:00',
+        },
+    }
   }
+  if (root.schemaVersion === 2) {
+    root = {
+      ...root,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      lastScan: root.lastScan ?? null,
+    }
+  }
+  return root
 }
 
 function parseRoom(value: unknown, path: string, issues: string[]): Room {
@@ -186,6 +201,27 @@ function parseSunSettings(value: unknown, path: string, issues: string[]): SunSe
     issues.push(`${path}.localDateTime muss YYYY-MM-DDTHH:mm entsprechen.`)
   }
   return { latitude, longitude, timeZone, northOffsetDeg, localDateTime }
+}
+
+function parseLastScan(value: unknown, path: string, issues: string[]): LastScanRecord | null {
+  if (value === null || value === undefined) return null
+  const item = record(value, path, issues)
+  const origins: ScanOrigin[] = ['demo-simulated', 'file-import']
+  const origin = origins.includes(item.origin as ScanOrigin)
+    ? (item.origin as ScanOrigin)
+    : (issues.push(`${path}.origin ist unbekannt.`), 'file-import')
+  const draftCount = finiteNumber(item.draftCount, `${path}.draftCount`, issues)
+  const issueCount = finiteNumber(item.issueCount, `${path}.issueCount`, issues)
+  if (draftCount < 0) issues.push(`${path}.draftCount darf nicht negativ sein.`)
+  if (issueCount < 0) issues.push(`${path}.issueCount darf nicht negativ sein.`)
+  return {
+    origin,
+    demo: item.demo === true,
+    adapterId: text(item.adapterId, `${path}.adapterId`, issues),
+    importedAt: isoDate(item.importedAt, `${path}.importedAt`, issues),
+    draftCount,
+    issueCount,
+  }
 }
 
 function parseDimensions(value: unknown, path: string, issues: string[]): Dimensions {
