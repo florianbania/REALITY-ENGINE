@@ -1,8 +1,9 @@
 # REALITY ENGINE
 
-Phase 4 einer modularen Web-App für einen gemeinsamen, messbaren digitalen
-Zwilling. **FIT**, **SUN**, **SPACE** und **SMART SCAN** (Dateiimport). Es gibt
-**keinen** getesteten nativen iPhone-Scan.
+Phase 5 einer modularen Web-App für einen gemeinsamen, messbaren digitalen
+Zwilling. SMART SCAN ist **Dateiimport plus ehrliche Verfügbarkeit**. Object
+Capture, ARKit/LiDAR und automatische Bounding-Box-Korrektur sind **nicht
+implementiert und nicht getestet**.
 
 ## Start
 
@@ -13,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Qualitätsprüfung:
+Qualität (lokal und in GitHub Actions):
 
 ```bash
 npm run lint
@@ -22,30 +23,17 @@ npm test
 npm run build
 ```
 
-## Phase-4-Schritt
+## Was Phase 5 zusätzlich leistet
 
-- dateibasierter Import von `reality-engine/scan@1` **und** RoomPlan-ähnlichem JSON
-- Validierung, Messquelle `scan`, dokumentierte Unsicherheit 0,05 m bei RoomPlan-Dateien
-- manuelle Messwertkorrektur (Quelle wird `manual`)
-- Demo-Simulation aus Phase 3 bleibt als gekennzeichnetes Fixture
-- natives Skelett unter `native/RoomPlanBridge/` — ausdrücklich unimplementiert und ungetestet
-
-## Architektur
-
-```text
-src/
-├── core/        # Datenmodell, Einheiten, Mutationen, Import/Export
-├── simulation/  # Kollision, Sonne, Flächen
-├── scan/        # Scan-Dokumente, RoomPlan-Dateiimport, Demo-Adapter
-└── web/         # React-Oberfläche
-native/RoomPlanBridge/   # unimplementierte iOS-Schnittstelle
-```
+- sichtbare Geräte-/Scan-Verfügbarkeit (Datei und Demo ja; native Capture nein)
+- CI für Lint, Typecheck, Tests und Build
+- Machbarkeitsnotiz unter `native/FEASIBILITY.md` ohne fingierte Scan-UI
 
 ## Bekannte Einschränkungen
 
-- Kein Live-LiDAR, keine Kamera, kein getesteter RoomPlan-Capture.
-- RoomPlan-Transform/Pose wird nicht in den Zwilling geschrieben.
-- Unsicherheit im RoomPlan-Import ist eine Annahme, keine Sensorstreuung.
-- Unbekannte Objektkategorien werden übersprungen, nicht erfunden.
+- Kein Live-LiDAR, keine Kamera, kein Object Capture, keine Mesh-Bounding-Box.
+- Verdeckte, spiegelnde oder unvollständige Aufnahmen sind in keiner Zahl
+  „wegkalibriert“. Es gibt keine Millimeter-Garantie.
+- RoomPlan-JSON: Unsicherheit 0,05 m als Annahme; Pose wird nicht übernommen.
 - FIT ohne Wegsuche; Türzonen Rechtecke; SUN ohne Wetter; SPACE 5-cm-Raster;
   Speicherung nur lokal.

@@ -1525,6 +1525,49 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
+.availability-list {
+  display: grid;
+  margin: 0 0 16px;
+  gap: 8px;
+}
+
+.availability-item {
+  display: grid;
+  padding: 8px;
+  border: 1px solid var(--line);
+  gap: 3px;
+  grid-template-columns: 1fr auto;
+}
+
+.availability-item strong {
+  color: #c5d4da;
+  font-size: 8px;
+}
+
+.availability-item em {
+  color: #8a9aaa;
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.availability-item span {
+  grid-column: 1 / -1;
+  color: #6d818f;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.availability-item--available em {
+  color: #59c995;
+}
+
+.availability-item--unimplemented em,
+.availability-item--unavailable em {
+  color: #c2a475;
+}
+
 .source-list {
   display: grid;
   gap: 6px;

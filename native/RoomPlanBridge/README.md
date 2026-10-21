@@ -23,3 +23,5 @@ Erwartete Dateistruktur (Untersatz):
 Kategorien, die auf das Zwilling-Modell abgebildet werden: sofa/couch, table, chair, storage/cabinet, bed. Andere Objekte werden übersprungen, nicht erfunden.
 
 Transform/Pose wird **nicht** in den Zwilling geschrieben. Die Unsicherheit beträgt dokumentiert **0,05 m**, weil RoomPlan-JSON keine Messunsicherheit mitliefert.
+
+Siehe auch `../FEASIBILITY.md` zu Object Capture, LiDAR und Bounding-Boxen.

@@ -75,7 +75,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
       <section className="hero">
         <div className="eyebrow">
           <span />
-          Digitaler Zwilling · Phase 04
+          Digitaler Zwilling · Phase 05
         </div>
         <h1>
           Räume verstehen.
@@ -122,7 +122,7 @@ export function Landing({ onEnter, onOpenProjects, projectCount }: LandingProps)
           code="04"
           title="SMART SCAN"
           description="RoomPlan-JSON dateibasiert übernehmen."
-          detail="Dateiimport · kein LiDAR"
+          detail="Dateiimport · Verfügbarkeit"
           icon={<ScanLine size={28} />}
           badge="Datei"
           onClick={() => onEnter('scan')}

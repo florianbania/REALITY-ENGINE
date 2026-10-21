@@ -5,6 +5,7 @@ import type { DigitalTwinProject } from '../core/model'
 import { SOURCE_LABELS } from '../core/model'
 import { formatLength } from '../core/units'
 import type { ScanApplyResult, ScanDocument } from '../scan/contracts'
+import { reportScanAvailability, STATUS_LABELS } from '../scan/availability'
 import { DemoSimulatedScanAdapter } from '../scan/demo-adapter'
 import { parseIncomingScan, ScanFormatError } from '../scan/document'
 
@@ -20,6 +21,7 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
   const [pending, setPending] = useState<ScanDocument | null>(null)
   const [result, setResult] = useState<ScanApplyResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const availability = reportScanAvailability()
 
   const loadDemo = async () => {
     setError(null)
@@ -77,10 +79,20 @@ export function ScanPanel({ project, onApply }: ScanPanelProps) {
         </div>
       </div>
       <p className="panel-copy">
-        Unterstützt reality-engine/scan@1 und RoomPlan-ähnliches JSON. Entwürfe
-        werden geometrisch geprüft. Die native RoomPlan-Erfassung ist nur als
-        unimplementiertes Skelett dokumentiert.
+        Unterstützt reality-engine/scan@1 und RoomPlan-ähnliches JSON. Object
+        Capture, ARKit/LiDAR und automatische Bounding-Boxen sind Machbarkeit —
+        nicht implementiert, nicht getestet, keine Präzisionsangabe.
       </p>
+      <h3>Geräte- und Scan-Verfügbarkeit</h3>
+      <div className="availability-list">
+        {availability.items.map((item) => (
+          <div key={item.id} className={`availability-item availability-item--${item.status}`}>
+            <strong>{item.label}</strong>
+            <em>{STATUS_LABELS[item.status]}</em>
+            <span>{item.detail}</span>
+          </div>
+        ))}
+      </div>
       <input
         ref={fileInput}
         type="file"
